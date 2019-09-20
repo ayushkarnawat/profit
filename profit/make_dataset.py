@@ -130,7 +130,6 @@ def convert_to_smiles(filepath: str,
         os.makedirs(save_dir)
     smiles_df.to_csv(save_path, index=False)
     logger.info('Saved dataset to `{0:s}`'.format(save_path))
-
     return smiles_df
 
 
@@ -229,6 +228,20 @@ def convert(filepath: str,
 
     Params:
     -------
+    filepath: str
+        Path where the dataset is located.
+
+    save_path: str
+        Path to store modified data.
+
+    x_name: str
+        Column name of data X.
+
+    y_name: str
+        Column name of labels associated with the data X.
+
+    n_workers: int, optional, default=1
+        Number of processors to use in parallel to compute coordinates.
     """
     logger.info('Loading dataset from `{0:s}`...'.format(filepath))
     ext = os.path.splitext(filepath)[1]
@@ -278,11 +291,38 @@ def convert(filepath: str,
     
 
 if __name__ == "__main__":
-    raw_fp = 'data/raw/vdgv570.csv'
-    interim_fp = 'data/interim/vdgv570_smiles.csv'
-    processed_fp = 'data/processed/vdgv570_3d.sdf'
+    import sys
+    import argparse
+    parser = argparse.ArgumentParser(prog=sys.argv[0], 
+                                     description='Converts raw dataset to processed for modeling.',
+                                     argument_default=argparse.SUPPRESS)
+    parser.add_argument('--raw_path', metavar='RAW DATASET PATH', type=str,
+                        help='Relative path to the dataset', required=True, default='data/raw/vdgv570.csv')
+    parser.add_argument('--interim_path', metavar='INTERIM DATA PATH', type=str,
+                        help='Relative path to save the interim dataset', default=None)
+    parser.add_argument('--processed_path', metavar='PROCESSED DATA PATH', type=str,
+                        help='Relative path to save the final, processed dataset', default=None)
+    parser.add_argument('-x', '--x_name', metavar='X', type=str, help='Column name of dataset X', 
+                        default='Variants')
+    parser.add_argument('-y', '--y_name', metavar='Y', type=str,
+                        help='Column name of labels associated with the data X', default='Fitness')
+    parser.add_argument('-c', '--constraints', metavar='SAVE CONSTRAINTS', type=bool,
+                        help='Save molecules with constraints or not', default=1)
+    parser.add_argument('-n', '--n_workers', metavar='NUM WORKERS', type=int,
+                        help='Number of workers', default=mp.cpu_count()-1)
+    args = vars(parser.parse_args())
 
-    # X,y = load_csv('data/raw/vdgv570.csv', x_name='Variants', y_name='Fitness', use_pd=False)
-    df = convert_to_smiles(raw_fp, interim_fp, x_name='Variants', y_name='Fitness', 
-                           save_constraints=True)
-    print(convert(interim_fp, processed_fp, x_name='SMILES', y_name='Fitness', n_workers=mp.cpu_count()-1))
+    # If the interim and processed filepaths are not provided, use default args
+    raw_fp = args['raw_path']
+    filename, ext = os.path.splitext(raw_fp)
+    if args['interim_path'] is None:
+        args['interim_path'] = filename + '_smiles' + ext
+    if args['processed_path'] is None:
+        args['processed_path'] = filename + '.sdf'
+    
+    # X,y = load_csv(args['raw_path'], x_name=args['x_name'], y_name=args['y_name'], use_pd=True)
+    df = convert_to_smiles(args['raw_path'], args['interim_path'], args['x_name'], args['y_name'], 
+                           save_constraints=bool(args['constraints']))
+    convert(args['interim_path'], args['processed_path'], x_name='SMILES', y_name=args['y_name'], 
+            n_workers=args['n_workers'])
+    

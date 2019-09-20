@@ -107,4 +107,5 @@ venv.bak/
 .vscode/
 
 # project specific
-data/**
+data/interim/**
+data/processed/**
