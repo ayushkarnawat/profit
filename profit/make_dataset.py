@@ -258,7 +258,7 @@ def convert(filepath: str,
         mol_idx = list(range(len(mols)))
     elif ext == '.sdf':
         mols = Chem.SDMolSupplier(filepath)
-        props = [mol.GetProp(y_name) for mol in mols]
+        props = [mol.GetProp(y_name) if mol.HasProp(y_name) else None for mol in mols]
         mol_idx = list(range(len(mols)))
     else:
         raise ValueError('Unsupported file type! Please provide a .csv or .sdf file.')
