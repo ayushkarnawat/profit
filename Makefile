@@ -11,7 +11,8 @@ rebuild:
 	@make install
 
 dataset:
-	python profit/make_dataset.py --raw_path data/raw/vdgv570.csv -c 1 -n 4
+	# Make dataset, allowing for constraints within molecules
+	python profit/make_dataset.py --raw_path data/raw/vdgv570.csv -c -n 2
 
 run: 
 	# Remove all instances of __pycache__ before running
