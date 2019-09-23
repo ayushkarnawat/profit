@@ -12,9 +12,9 @@ rebuild:
 
 dataset:
 	# Make dataset, allowing for constraints within molecules
-	python profit/make_dataset.py --raw_path data/raw/vdgv570.csv -c -n 2
+	python scripts/make_dataset.py --raw_path data/raw/vdgv570.csv -c -n 2
 
-run: 
+test: 
 	# Remove all instances of __pycache__ before running
 	find . | grep -E "(__pycache__|\.pyc$)" | xargs rm -rf
 	python -m test.test

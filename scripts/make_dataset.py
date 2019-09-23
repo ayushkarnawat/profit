@@ -311,7 +311,7 @@ if __name__ == "__main__":
     parser.add_argument('-n', '--n_workers', metavar='NUM WORKERS', type=int,
                         help='Number of workers', default=mp.cpu_count()-1)
     args = vars(parser.parse_args())
-
+    
     # If the interim and processed filepaths are not provided, use default args
     raw_fp = args['raw_path']
     filename, ext = os.path.splitext(raw_fp)
