@@ -11,7 +11,7 @@ rebuild:
 	@make install
 
 dataset:
-	# Make dataset, allowing for constraints within molecules
+	# Make dataset, allowing for constraints (`-c` command) within molecules
 	python scripts/make_dataset.py --raw_path data/raw/vdgv570.csv -c -n 2
 
 test: 

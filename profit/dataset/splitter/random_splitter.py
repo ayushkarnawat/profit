@@ -36,8 +36,8 @@ class RandomSplitter(BaseSplitter):
         splitted_data: Tuple[np.ndarray, np.ndarray, np.ndarray]
             The splitted data into their train, validation, and test sets, respectively.
         """
-        # Test inputs for equality
-        seed = kwargs.get('seed')
+        # Test inputs
+        seed = kwargs.get('seed', None)
         np.testing.assert_almost_equal(frac_train + frac_val + frac_test, 1.0)
 
         if seed is not None:
@@ -133,3 +133,4 @@ if __name__ == "__main__":
     splitter  = RandomSplitter()
     X_train, X_val = splitter.train_valid_split(X, frac_train=0.8, frac_val=0.2, return_idxs=False, seed=None)
     print(X_train.shape, X_val.shape)
+    
