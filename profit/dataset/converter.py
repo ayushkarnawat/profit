@@ -1,9 +1,9 @@
 """Module to convert raw dataset into processed form."""
 
 import os
-import logging
 import multiprocessing as mp
 
+from logging import getLogger
 from typing import Tuple, Optional, Any
 
 
@@ -18,12 +18,7 @@ from profit.cyclops import struct_gen as sg
 
 
 # Setup logging
-logger = logging.getLogger(__name__)
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s  %(levelname)-8s %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger = getLogger(__name__)
 
 
 def convert_to_smiles(filepath: str, 
@@ -58,7 +53,7 @@ def convert_to_smiles(filepath: str,
     """
     # Load data
     logger.info('Loading dataset from `{0:s}`...'.format(filepath))
-    X,y = load_csv(filepath, x_name=x_name, y_name=y_name, use_pd=True)
+    X,y = load_csv(filepath, x_name=x_name, y_name=y_name)
 
     # Setup pandas df
     cols = ['Variant', 'Constraints', 'SMILES']
@@ -147,7 +142,7 @@ def optimize_coords(idx: int,
         if not arr:
             return None, None
         else:
-            arr = AllChem.UFFOptimizeMoleculeConfs(mol, maxIters=20000)
+            arr = AllChem.UFFOptimizeMoleculeConfs(mol, maxIters=2000)
             idx = np.argmin(arr, axis=0)[1]
             conf = mol.GetConformers()[idx]
             mol.RemoveAllConformers()
@@ -164,7 +159,7 @@ def optimize_coords(idx: int,
         if not arr:
             return None, None
         else:
-            arr = AllChem.MMFFOptimizeMoleculeConfs(mol, maxIters=20000)
+            arr = AllChem.MMFFOptimizeMoleculeConfs(mol, maxIters=2000)
             idx = np.argmin(arr, axis=0)[1]
             conf = mol.GetConformers()[idx]
             mol.RemoveAllConformers()
@@ -206,7 +201,7 @@ def convert(filepath: str,
 
     # Load dataset
     if ext == '.csv':
-        X,y = load_csv(filepath, x_name=x_name, y_name=y_name, use_pd=True)
+        X,y = load_csv(filepath, x_name=x_name, y_name=y_name)
         mols, props = [], []
         for smi, prop in zip(X, y):
             mol = Chem.MolFromSmiles(smi)

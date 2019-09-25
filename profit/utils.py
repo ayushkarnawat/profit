@@ -1,16 +1,19 @@
 """General utils."""
-import csv
+
+try:
+    import pandas as pd
+    use_pd = True
+except ImportError:
+    import csv
+    use_pd = False
 
 import numpy as np
-import pandas as pd
-
-from typing import Optional, Tuple
+from typing import Tuple
 
 
 def load_csv(filepath: str, 
              x_name: str, 
-             y_name: str, 
-             use_pd: Optional[bool]=True) -> Tuple[int, int]:
+             y_name: str) -> Tuple[int, int]:
     """
     Loads the raw dataset.
 

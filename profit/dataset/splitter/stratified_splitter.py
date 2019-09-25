@@ -137,7 +137,7 @@ class StratifiedSplitter(BaseSplitter):
 
         # Stratify samples from distribution for both validation and test sets. 
         # Remainder is the distribution of the training set. 
-        # NOTE: The percentage of each class should be equally represented in all 3 sets. 
+        # NOTE: The percentage of each class/bin should be equally represented in all 3 sets. 
         n_val_samples = _approximate_mode(class_counts, n_total_val)
         class_counts -= n_val_samples # remove validation samples from total count before sampling for test set
         n_test_samples = _approximate_mode(class_counts, n_total_test)

@@ -103,8 +103,11 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-# vscode workspace settings
+# VScode workspace settings
 .vscode/
+
+# MacOS
+.DS_Store
 
 # project specific
 data/interim/**
