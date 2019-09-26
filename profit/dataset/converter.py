@@ -1,9 +1,9 @@
 """Module to convert raw dataset into processed form."""
 
 import os
+import logging
 import multiprocessing as mp
 
-from logging import getLogger
 from typing import Tuple, Optional, Any
 
 
@@ -18,7 +18,12 @@ from profit.cyclops import struct_gen as sg
 
 
 # Setup logging
-logger = getLogger(__name__)
+logger = logging.getLogger()
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s  %(levelname)-8s %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
 
 
 def convert_to_smiles(filepath: str, 
@@ -62,6 +67,7 @@ def convert_to_smiles(filepath: str,
     logger.info('Converting peptides to SMILES strings')
     structs = sg.gen_structs_from_seqs(X, ssbond=True, htbond=True, scctbond=True, 
                                        scntbond=True, scscbond=True, linear=True)
+    
     for idx, struct in enumerate(structs):
         smiles_df.loc[idx] = list(struct)
     
@@ -74,7 +80,7 @@ def convert_to_smiles(filepath: str,
     # Since there is only one instance of each variant, we can simply store the scores. NOTE: 
     # Ideally should check if each "fitness" score is associated with the right variant.  
     smiles_df['Fitness'] = y
-
+    
     # Save dataset to file. Checks if intended filepath is available.
     save_path = os.path.expanduser(save_path)
     save_dir, _ = os.path.split(save_path)
@@ -89,13 +95,23 @@ def convert_to_smiles(filepath: str,
 def optimize_coords(idx: int, 
                     m: Chem.Mol, 
                     prop: Any, 
-                    algo: Optional[str]="MMFF") -> Tuple[Chem.Mol, Any]:
+                    algo: Optional[str]="ETKDG") -> Tuple[Chem.Mol, Any]:
     """
     Optimize 3D coordinates for each compound. Defines the XYZ positions for each atom in the 
     molecule. 
 
     In order to get accurate 3D conformations, it is a good idea to add H's to molecule first, 
     embed (write) and optimize the coordinates, and then remove the unwanted H's. 
+
+    NOTE: Conformation generation is a difficult and subtle task. The original 2D->3D conversion
+    provided with the RDKit was not intended to be a replacement for a “real” conformational 
+    analysis tool; it merely provides quick 3D structures for cases when they are required. We 
+    believe, however, that the newer ETKDG method[#riniker2]_ should be adequate for most purposes.
+    See: https://www.rdkit.org/docs/GettingStartedInPython.html#working-with-3d-molecules.
+
+    Additionally, using the 'UFF' and 'MMFF' algorithm will generate multiple conformations for 
+    each compound, optimize them using their respective force field, and then choose the 
+    conformation that has the lowest energy. This is computationally very expensive.  
 
     Params:
     -------
@@ -108,8 +124,9 @@ def optimize_coords(idx: int,
     prop: Any
         Property associated with the molecule.
 
-    algo: str, optional, default='MMFF'
-        Which force field algorithm to optimize the coordinates with.
+    algo: str, optional, default='ETKDG'
+        Which force field algorithm to optimize the coordinates with. Read description to determine
+        which one is best suited for yout application.
 
     Returns:
     --------
@@ -119,48 +136,48 @@ def optimize_coords(idx: int,
     prop: Any
         Property associated with the molecule.
     """
-    logger.info("Optimizing coords for compound {0:d}: {1:s}...".format(idx, Chem.MolToSmiles(m)))
+    logger.info("Optimizing coords for compound {0:d} using {1:s}: {2:s}...".format(idx, algo, Chem.MolToSmiles(m)))
 
-    # Add H's to molecule
-    mol = Chem.AddHs(m)
+    # Add H's to molecule (with 3D coords)
+    mol = Chem.AddHs(m, addCoords=True)
 
     # Optimize and embed (write) coordinates using one of the defined force fields.
     if algo == "ETKDG":
-        # Landrum et al. DOI: 10.1021/acs.jcim.5b00654
+        # Fast, and accurate conformation generator
         k = AllChem.EmbedMolecule(mol, AllChem.ETKDG())
         if k != 0:
             return None, None
 
     elif algo == "UFF":
         # Universal Force Field
-        AllChem.EmbedMultipleConfs(mol, 50, pruneRmsThresh=0.5)
+        AllChem.EmbedMultipleConfs(mol, 50, pruneRmsThresh=0.5, numThreads=0)
         try:
-            arr = AllChem.UFFOptimizeMoleculeConfs(mol, maxIters=2000)
+            arr = AllChem.UFFOptimizeMoleculeConfs(mol, maxIters=2000, numThreads=0)
         except ValueError:
             return None, None
 
         if not arr:
             return None, None
         else:
-            arr = AllChem.UFFOptimizeMoleculeConfs(mol, maxIters=2000)
-            idx = np.argmin(arr, axis=0)[1]
+            arr = AllChem.UFFOptimizeMoleculeConfs(mol, maxIters=2000, numThreads=0)
+            idx = np.argmin(arr, axis=0)[1] # get idx of lowest energy conformation
             conf = mol.GetConformers()[idx]
             mol.RemoveAllConformers()
             mol.AddConformer(conf)
 
     elif algo == "MMFF":
         # Merck Molecular Force Field
-        AllChem.EmbedMultipleConfs(mol, 50, pruneRmsThresh=0.5)
+        AllChem.EmbedMultipleConfs(mol, 50, pruneRmsThresh=0.5, numThreads=0)
         try:
-            arr = AllChem.MMFFOptimizeMoleculeConfs(mol, maxIters=2000)
+            arr = AllChem.MMFFOptimizeMoleculeConfs(mol, maxIters=2000, numThreads=0)
         except ValueError:
             return None, None
 
         if not arr:
             return None, None
         else:
-            arr = AllChem.MMFFOptimizeMoleculeConfs(mol, maxIters=2000)
-            idx = np.argmin(arr, axis=0)[1]
+            arr = AllChem.MMFFOptimizeMoleculeConfs(mol, maxIters=2000, numThreads=0)
+            idx = np.argmin(arr, axis=0)[1] # get idx of lowest energy conformation
             conf = mol.GetConformers()[idx]
             mol.RemoveAllConformers()
             mol.AddConformer(conf)
@@ -240,5 +257,6 @@ def convert(filepath: str,
     # Save coordinates to file
     writer = Chem.SDWriter(save_path)
     for m in mol_list: writer.write(m)
+    writer.close()
     logger.info('Saved {0:d} molecules to `{1:s}`'.format(len(mol_list), save_path))
     

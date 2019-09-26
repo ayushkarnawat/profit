@@ -2,10 +2,8 @@
 
 try:
     import pandas as pd
-    use_pd = True
 except ImportError:
     import csv
-    use_pd = False
 
 import numpy as np
 from typing import Tuple
@@ -36,11 +34,12 @@ def load_csv(filepath: str,
     y: np.ndarray
         Extracted labels corresponding to the dataset X. 
     """
-    if use_pd:
+    # If pandas exists, then use it, otherwise use csv
+    try:
         df = pd.read_csv(filepath, sep=',')
         X = np.array(df[x_name].values, dtype=str)
         y = np.array(df[y_name].values, dtype=float)
-    else:
+    except NameError:
         X,y = [], []
         with open(filepath) as file:
             reader = csv.DictReader(file)
