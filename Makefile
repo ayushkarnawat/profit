@@ -2,6 +2,8 @@ remove:
 	rm -rf build/
 	rm -rf dist/
 	rm -rf *.egg-info
+	# Remove all instances of __pycache__
+	find . | grep -E "(__pycache__|\.pyc)" | xargs rm -rf
 
 install:
 	python setup.py install
@@ -12,9 +14,9 @@ rebuild:
 
 dataset:
 	# Make dataset, allowing for constraints (`-c` command) within molecules
-	python scripts/make_dataset.py --raw_path data/raw/vdgv570.csv -c -n 2
+	python scripts/make_dataset.py --raw_path data/raw/vdgv570.csv -c -n 2 -a ETKDG
 
-test: 
+run: 
 	# Remove all instances of __pycache__ before running
-	find . | grep -E "(__pycache__|\.pyc$)" | xargs rm -rf
+	find . | grep -E "(__pycache__|\.pyc)" | xargs rm -rf
 	python -m test.test

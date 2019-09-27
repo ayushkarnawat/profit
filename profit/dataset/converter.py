@@ -4,6 +4,7 @@ import os
 import logging
 import multiprocessing as mp
 
+from functools import partial
 from typing import Tuple, Optional, Any
 
 
@@ -13,7 +14,7 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-from profit.utils import load_csv
+from profit.utils.io import load_csv
 from profit.cyclops import struct_gen as sg
 
 
@@ -101,7 +102,7 @@ def optimize_coords(idx: int,
     molecule. 
 
     In order to get accurate 3D conformations, it is a good idea to add H's to molecule first, 
-    embed (write) and optimize the coordinates, and then remove the unwanted H's. 
+    embed (write) and optimize the coordinates, and then remove the unwanted H's.
 
     NOTE: Conformation generation is a difficult and subtle task. The original 2D->3D conversion
     provided with the RDKit was not intended to be a replacement for a “real” conformational 
@@ -109,16 +110,18 @@ def optimize_coords(idx: int,
     believe, however, that the newer ETKDG method[#riniker2]_ should be adequate for most purposes.
     See: https://www.rdkit.org/docs/GettingStartedInPython.html#working-with-3d-molecules.
 
-    Additionally, using the 'UFF' and 'MMFF' algorithm will generate multiple conformations for 
-    each compound, optimize them using their respective force field, and then choose the 
-    conformation that has the lowest energy. This is computationally very expensive.  
+    Additionally, using the 'UFF' and 'MMFF' algorithm will generate multiple conformations 
+    (different torsion angles for side chains) for each compound, optimize them using their 
+    respective force field, and then choose the conformation that has the lowest energy. 
+    This is computationally very expensive. GPU optimization using OpenMM can help, see
+    https://gist.github.com/ptosco/7feeda611f6bfd1095fecc2b07a73b87.
 
     Params:
     -------
     idx: int
         Index location of molecule within dataset.
     
-    m: Chem.Mol
+    m: rdkit.Chem.Mol
         The molecule to optimize.
     
     prop: Any
@@ -130,7 +133,7 @@ def optimize_coords(idx: int,
 
     Returns:
     --------
-    mol: Chem.Mol
+    mol: rdkit.Chem.Mol
         Optimized molecule.
 
     prop: Any
@@ -147,7 +150,6 @@ def optimize_coords(idx: int,
         k = AllChem.EmbedMolecule(mol, AllChem.ETKDG())
         if k != 0:
             return None, None
-
     elif algo == "UFF":
         # Universal Force Field
         AllChem.EmbedMultipleConfs(mol, 50, pruneRmsThresh=0.5, numThreads=0)
@@ -164,7 +166,6 @@ def optimize_coords(idx: int,
             conf = mol.GetConformers()[idx]
             mol.RemoveAllConformers()
             mol.AddConformer(conf)
-
     elif algo == "MMFF":
         # Merck Molecular Force Field
         AllChem.EmbedMultipleConfs(mol, 50, pruneRmsThresh=0.5, numThreads=0)
@@ -181,6 +182,9 @@ def optimize_coords(idx: int,
             conf = mol.GetConformers()[idx]
             mol.RemoveAllConformers()
             mol.AddConformer(conf)
+    else:
+        raise ValueError("{0:s} algo not supported. Please use ETKDG (recommended), UFF, or MMFF "
+                         "to optimize the molecule's 3D geometry.".format(algo)) 
 
     # Remove unwanted H's from molecule
     mol = Chem.RemoveHs(mol)
@@ -191,6 +195,7 @@ def convert(filepath: str,
             save_path: str, 
             x_name: str, 
             y_name: str, 
+            algo: Optional[str]='ETKDG',
             n_workers: Optional[int]=mp.cpu_count()-1) -> None:
     """
     Load the SMILES representations of the molecules and process into final processed dataset.
@@ -209,6 +214,9 @@ def convert(filepath: str,
 
     y_name: str
         Column name of labels associated with the data X.
+
+    algo: str, optional, default='ETKDG'
+        Algorithm with which to optimize molecule's 3D structure.
 
     n_workers: int, optional, default=1
         Number of processors to use in parallel to compute coordinates.
@@ -236,8 +244,9 @@ def convert(filepath: str,
 
     # Optimize 3D coordinates using multiprocessing. NOTE: This takes a long time.
     logger.info("Optimizing coordinates...")
+    optimize_algo = partial(optimize_coords, algo=algo)
     pool = mp.Pool(processes=n_workers)
-    results = pool.starmap(func=optimize_coords, iterable=zip(mol_idx, mols, props))
+    results = pool.starmap(func=optimize_algo, iterable=zip(mol_idx, mols, props))
 
     # Add properties associated with mols
     mol_list = []

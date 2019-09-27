@@ -6,8 +6,8 @@ import multiprocessing as mp
 from profit.dataset import converter
 
 parser = argparse.ArgumentParser(prog=sys.argv[0], 
-                                    description='Converts raw dataset to processed for modeling.',
-                                    argument_default=argparse.SUPPRESS)
+                                 description='Prepares raw dataset for modeling.',
+                                 argument_default=argparse.SUPPRESS)
 parser.add_argument('--raw_path', metavar='RAW DATASET PATH', type=str,
                     help='Relative path to the dataset', required=True, default='data/raw/vdgv570.csv')
 parser.add_argument('--interim_path', metavar='INTERIM DATA PATH', type=str,
@@ -22,20 +22,25 @@ parser.add_argument('-c', '--constraints', action='store_true',
                     help='Save molecules with constraints or not', default=False)
 parser.add_argument('-n', '--n_workers', metavar='NUM WORKERS', type=int,
                     help='Number of workers', default=mp.cpu_count()-1)
+parser.add_argument('-a', '--algo', metavar='ALGORITHM', type=str,
+                    help="Algorithm to optimize molecule's 3D structure.", default='ETKDG')
 args = vars(parser.parse_args())
 
 # If the interim and processed filepaths are not provided, use default args
 raw_fp = args['raw_path']
-filename, ext = os.path.splitext(raw_fp)
-split_file = filename.split('/')
+split_file = os.path.splitext(raw_fp)[0].split('/')
 if args['interim_path'] is None:
-    args['interim_path'] = split_file[0] + '/interim/' + split_file[-1] + '_smiles' + ext
+    args['interim_path'] = "{0:s}/interim/{1:s}-constraints={2:b}.csv".format(split_file[0], 
+                                                                              split_file[-1], 
+                                                                              args['constraints'])
 if args['processed_path'] is None:
-    args['processed_path'] = split_file[0] + '/processed/' + split_file[-1] + '.sdf'
+    args['processed_path'] = "{0:s}/processed/{1:s}-constraints={2:b}-algo={3:s}.sdf".format(split_file[0], 
+                                                                                             split_file[-1], 
+                                                                                             args['constraints'], 
+                                                                                             args['algo'])
 
-# X,y = load_csv(args['raw_path'], x_name=args['x_name'], y_name=args['y_name'], use_pd=True)
 df = converter.convert_to_smiles(args['raw_path'], args['interim_path'], args['x_name'], 
                                  args['y_name'], save_constraints=args['constraints'])
 converter.convert(args['interim_path'], args['processed_path'], x_name='SMILES', 
-                  y_name=args['y_name'], n_workers=args['n_workers'])
+                  y_name=args['y_name'], algo=args['algo'], n_workers=args['n_workers'])
     

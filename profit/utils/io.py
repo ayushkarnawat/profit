@@ -1,4 +1,4 @@
-"""General utils."""
+"""I/O utils."""
 
 try:
     import pandas as pd

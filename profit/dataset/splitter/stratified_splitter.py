@@ -96,7 +96,7 @@ class StratifiedSplitter(BaseSplitter):
         task_type = kwargs.get('task_type', 'auto')
         if task_type not in ['classification', 'regression', 'auto']:
             raise ValueError("{0:s} is invalid. Please use 'classification',"
-                             "'regression' or 'auto'".format(task_type))
+                             "'regression', or 'auto'".format(task_type))
 
         rng = np.random.RandomState(seed)
 
@@ -113,7 +113,7 @@ class StratifiedSplitter(BaseSplitter):
             if np.all(np.mod(labels, 1) == 0):
                 labels = labels.astype(int)
         else:
-            raise ValueError("Invalid label type {0:s}. Please ensure your labels are ints or,"
+            raise ValueError("Invalid label type {0:s}. Please ensure your labels are ints or "
                              "floats.".format(labels.dtype.kind))
 
         if task_type == 'auto':
