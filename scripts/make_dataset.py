@@ -30,10 +30,10 @@ args = vars(parser.parse_args())
 raw_fp = args['raw_path']
 split_file = os.path.splitext(raw_fp)[0].split('/')
 if args['interim_path'] is None:
-    args['interim_path'] = "{0:s}/interim/{1:s}-constraints={2:b}.csv".format
+    args['interim_path'] = "{0:s}/interim/{1:s}-constraints={2:b}.csv".format \
         (split_file[0], split_file[-1], args['constraints'])
 if args['processed_path'] is None:
-    args['processed_path'] = "{0:s}/processed/{1:s}-constraints={2:b}-algo={3:s}.sdf".format\
+    args['processed_path'] = "{0:s}/processed/{1:s}-constraints={2:b}-algo={3:s}.sdf".format \
         (split_file[0], split_file[-1], args['constraints'], args['algo'])
 
 df = converter.convert_to_smiles(args['raw_path'], args['interim_path'], args['x_name'], 

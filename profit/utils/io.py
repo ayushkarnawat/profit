@@ -5,8 +5,19 @@ try:
 except ImportError:
     import csv
 
+import os
+import logging
 import numpy as np
 from typing import Tuple
+
+
+# Setup logging
+logger = logging.getLogger()
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s  %(levelname)-8s %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
 
 
 def load_csv(filepath: str, 
@@ -49,3 +60,25 @@ def load_csv(filepath: str,
         X = np.array(X, dtype=str)
         y = np.array(y, dtype=float)
     return X,y
+
+
+def maybe_create_dir(path: str) -> str:
+    """Create directory if it doesn't already exist. 
+    
+    Params:
+    -------
+    path: str
+        Full path to save data.
+
+    Returns:
+    --------
+    path: str
+        Full path to where directory was created.
+    """
+    save_path = os.path.expanduser(path)
+    save_dir, _ = os.path.split(save_path)
+    if not os.path.exists(save_dir):
+        logger.info('Creating directory `{0:s}`'.format(save_dir))
+        os.makedirs(save_dir)
+    return save_path
+    

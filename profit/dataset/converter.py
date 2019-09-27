@@ -14,7 +14,7 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-from profit.utils.io import load_csv
+from profit.utils.io import load_csv, maybe_create_dir
 from profit.cyclops import struct_gen as sg
 
 
@@ -83,11 +83,7 @@ def convert_to_smiles(filepath: str,
     smiles_df['Fitness'] = y
     
     # Save dataset to file. Checks if intended filepath is available.
-    save_path = os.path.expanduser(save_path)
-    save_dir, _ = os.path.split(save_path)
-    if not os.path.exists(save_dir):
-        logger.info('Creating directory `{0:s}`'.format(save_dir))
-        os.makedirs(save_dir)
+    save_path = maybe_create_dir(save_path)
     smiles_df.to_csv(save_path, index=False)
     logger.info('Saved dataset to `{0:s}`'.format(save_path))
     return smiles_df
@@ -255,15 +251,9 @@ def convert(filepath: str,
             mol.SetProp(y_name, str(prop))
             mol_list.append(mol)
     logger.info('Optimized {0:d} molecules.'.format(len(mol_list)))
-
-    # Create directory if unavailable
-    save_path = os.path.expanduser(save_path)
-    save_dir, _ = os.path.split(save_path)
-    if not os.path.exists(save_dir):
-        logger.info('Creating directory `{0:s}`'.format(save_dir))
-        os.makedirs(save_dir)
     
     # Save coordinates to file
+    save_path = maybe_create_dir(save_path)
     writer = Chem.SDWriter(save_path)
     for m in mol_list: writer.write(m)
     writer.close()
