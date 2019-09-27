@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from profit.dataset.splitter.base_splitter import BaseSplitter
+from profit.dataset.splitters.base_splitter import BaseSplitter
 from typing import Any, Dict, Optional, Tuple, Union
 
 

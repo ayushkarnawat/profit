@@ -19,4 +19,4 @@ dataset:
 run: 
 	# Remove all instances of __pycache__ before running
 	find . | grep -E "(__pycache__|\.pyc)" | xargs rm -rf
-	python -m test.test
+	pytest -v
