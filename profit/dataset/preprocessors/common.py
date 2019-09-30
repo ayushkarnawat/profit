@@ -82,8 +82,8 @@ def construct_mol_features(mol: Chem.Mol, out_size: Optional[int]=-1) -> np.ndar
 
     out_size: int, optional, default=-1
         The size of the returned array. If this option is negative, it does not take any effect.
-        Otherwise, it must be larger than the number of atoms in the input molecule. If so, the 
-        end of the array is padded with zeros.
+        Otherwise, it must be larger than or equal to the number of atoms in the input molecule. 
+        If so, the end of the array is padded with zeros.
 
     Returns:
     --------
@@ -159,6 +159,7 @@ def construct_mol_features(mol: Chem.Mol, out_size: Optional[int]=-1) -> np.ndar
 
 def construct_adj_matrix(mol: Chem.Mol, 
                          out_size: Optional[int]=-1, 
+                         add_self_loops: Optional[bool]=True,
                          normalize: Optional[bool]=True) -> np.ndarray:
     """Returns the adjacency matrix of the molecule.
 
@@ -186,8 +187,12 @@ def construct_adj_matrix(mol: Chem.Mol,
 
     out_size: int, optional, default=-1
         The size of the returned array. If this option is negative, it does not take any effect.
-        Otherwise, it must be larger than the number of atoms in the input molecule. If so, the 
-        end of the array is padded with zeros.
+        Otherwise, it must be larger than or equal to the number of atoms in the input molecule. 
+        If so, the end of the array is padded with zeros.
+
+    add_self_loops: bool, optional, default=True
+        Whether or not to add the `I` matrix (aka self-connections). If normalize is True, this 
+        option is ignored.
 
     normalize: bool, optional, default=True
         Whether or not to normalize the matrix. If `True`, the diagonal elements are filled with 1,
@@ -202,14 +207,16 @@ def construct_adj_matrix(mol: Chem.Mol,
     adj = rdmolops.GetAdjacencyMatrix(mol)
     s1, s2 = adj.shape # shape=(n_atoms, n_atoms) 
 
-    # Normalize using D^(-1/2) * A_hat * D^(-1/2), Kipf et. al. 2016
+    # Normalize using D^(-1/2) * A_hat * D^(-1/2)
     if normalize:
-        adj = adj + np.eye(s1)
+        adj += np.eye(s1)
         degree = np.array(adj.sum(1))
         deg_inv_sqrt = np.power(degree, -0.5)
         deg_inv_sqrt[np.isinf(deg_inv_sqrt)] = 0.
         deg_inv_sqrt = np.diag(deg_inv_sqrt)
         adj = deg_inv_sqrt
+    elif add_self_loops:
+        adj += np.eye(s1)
     
     if out_size < 0:
         return adj
@@ -233,8 +240,8 @@ def construct_pos_matrix(mol: Chem.Mol, out_size: Optional[int]=-1) -> np.ndarra
 
     out_size: int, optional, default=-1
         The size of the returned array. If this option is negative, it does not take any effect.
-        Otherwise, it must be larger than the number of atoms in the input molecule. If so, the 
-        end of the array is padded with zeros.
+        Otherwise, it must be larger than or equal to the number of atoms in the input molecule. 
+        If so, the end of the array is padded with zeros.
 
     Returns:
     --------
@@ -276,4 +283,3 @@ def construct_pos_matrix(mol: Chem.Mol, out_size: Optional[int]=-1) -> np.ndarra
             neigh_pos = coords[neighbor_idx] # neighboring atom
             pos_matrix[atom_idx, neighbor_idx] = atom_pos - neigh_pos # dist between neighbor -> center
     return pos_matrix
-    
