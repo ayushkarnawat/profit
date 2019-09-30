@@ -209,14 +209,14 @@ def construct_adj_matrix(mol: Chem.Mol,
 
     # Normalize using D^(-1/2) * A_hat * D^(-1/2)
     if normalize:
-        adj += np.eye(s1)
+        adj = adj + np.eye(s1)
         degree = np.array(adj.sum(1))
         deg_inv_sqrt = np.power(degree, -0.5)
         deg_inv_sqrt[np.isinf(deg_inv_sqrt)] = 0.
         deg_inv_sqrt = np.diag(deg_inv_sqrt)
         adj = deg_inv_sqrt
     elif add_self_loops:
-        adj += np.eye(s1)
+        adj = adj + np.eye(s1)
     
     if out_size < 0:
         return adj
@@ -253,7 +253,7 @@ def construct_pos_matrix(mol: Chem.Mol, out_size: Optional[int]=-1) -> np.ndarra
     >>> smiles = 'N[C@@]([H])([C@]([H])(O2)C)C(=O)N[C@@]([H])(CC(=O)N)C(=O)N[C@@]([H])([C@]([H])' \
                  '(O)C)C(=O)N[C@@]([H])(Cc1ccc(O)cc1)C(=O)2'
     >>> mol = Chem.MolFromSmiles(smiles)
-    >>> mol = Chem.AddHs(m, addCoords=True)
+    >>> mol = Chem.AddHs(mol, addCoords=True)
     >>> AllChem.EmbedMolecule(mol, AllChem.ETKDG())
     >>> mol = Chem.RemoveHs(mol)
     >>> pos_matrix = construct_pos_matrix(mol, out_size=-1)
