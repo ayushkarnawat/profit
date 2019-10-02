@@ -1,6 +1,6 @@
 import numpy as np
 
-from rdkit import Chem
+from rdkit.Chem import rdchem
 from typing import Optional, Tuple
 
 from profit.dataset.preprocessors.base import BasePreprocessor
@@ -42,12 +42,12 @@ class GCNPreprocessor(BasePreprocessor):
         self.out_size = out_size
 
     
-    def get_input_feats(self, mol: Chem.Mol) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def get_input_feats(self, mol: rdchem.Mol) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute input features for the molecule.
         
         Params:
         -------
-        mol: rdkit.Chem.Mol
+        mol: rdkit.Chem.rdchem.Mol
             Molecule of interest whose features will be extracted.
 
         Returns:

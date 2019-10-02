@@ -1,18 +1,17 @@
 import numpy as np
 
-from rdkit import Chem
-from rdkit.Chem import AllChem, rdmolops
 from typing import Any, List, Optional
+from rdkit.Chem import rdchem, rdmolops, rdPartialCharges
 
 
-HYDROGEN_DONOR = Chem.MolFromSmarts("[$([N;!H0;v3,v4&+1]),$([O,S;H1;+0]),n&H1&+0]")
-HYROGEN_ACCEPTOR = Chem.MolFromSmarts("[$([O,S;H1;v2;!$(*-*=[O,N,P,S])]),$([O,S;H0;v2]),$([O,S" + 
-                                      ";-]),$([N;v3;!$(N-*=[O,N,P,S])]),n&H0&+0,$([o,s;+0;!$([" + 
-                                      "o,s]:n);!$([o,s]:c:n)])]")
-ACIDIC = Chem.MolFromSmarts("[$([C,S](=[O,S,P])-[O;H1,-1])]")
-BASIC = Chem.MolFromSmarts("[#7;+,$([N;H2&+0][$([C,a]);!$([C,a](=O))]),$([N;H1&+0]([$([C,a]);!" + 
-                           "$([C,a](=O))])[$([C,a]);!$([C,a](=O))]),$([N;H0&+0]([C;!$(C(=O))])" + 
-                           "([C;!$(C(=O))])[C;!$(C(=O))])]")
+HYDROGEN_DONOR = rdchem.MolFromSmarts("[$([N;!H0;v3,v4&+1]),$([O,S;H1;+0]),n&H1&+0]")
+HYROGEN_ACCEPTOR = rdchem.MolFromSmarts("[$([O,S;H1;v2;!$(*-*=[O,N,P,S])]),$([O,S;H0;v2]),$([O" + 
+                                        ",S;-]),$([N;v3;!$(N-*=[O,N,P,S])]),n&H0&+0,$([o,s;+0;" + 
+                                        "!$([o,s]:n);!$([o,s]:c:n)])]")
+ACIDIC = rdchem.MolFromSmarts("[$([C,S](=[O,S,P])-[O;H1,-1])]")
+BASIC = rdchem.MolFromSmarts("[#7;+,$([N;H2&+0][$([C,a]);!$([C,a](=O))]),$([N;H1&+0]([$([C,a])" + 
+                             ";!$([C,a](=O))])[$([C,a]);!$([C,a](=O))]),$([N;H0&+0]([C;!$(C(=O" + 
+                             "))])([C;!$(C(=O))])[C;!$(C(=O))])]")
 
 
 class MolFeatureExtractionError(Exception):
@@ -50,7 +49,7 @@ def one_hot(x: Any, allowable_set: List[Any]) -> List[int]:
     return list(map(lambda s: int(x == s), allowable_set))
 
 
-def check_num_atoms(mol: Chem.Mol, max_num_atoms: Optional[int]=-1):
+def check_num_atoms(mol: rdchem.Mol, max_num_atoms: Optional[int]=-1):
     """Check number of atoms in `mol` does not exceed `max_num_atoms`.
 
     If number of atoms in `mol` exceeds the number `max_num_atoms`, it will
@@ -58,7 +57,7 @@ def check_num_atoms(mol: Chem.Mol, max_num_atoms: Optional[int]=-1):
 
     Params:
     -------
-    mol: rdkit.Chem.Mol
+    mol: rdkit.Chem.rdchem.Mol
         The molecule to check.
         
     num_max_atoms: int, optional , default=-1 
@@ -70,12 +69,12 @@ def check_num_atoms(mol: Chem.Mol, max_num_atoms: Optional[int]=-1):
             .format(num_atoms, max_num_atoms))
 
 
-def construct_mol_features(mol: Chem.Mol, out_size: Optional[int]=-1) -> np.ndarray:
+def construct_mol_features(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.ndarray:
     """Returns the atom features of all the atoms in the molecule.
     
     Params:
     -------
-    mol: rdkit.Chem.Mol
+    mol: rdkit.Chem.rdchem.Mol
         Molecule of interest. 
 
     out_size: int, optional, default=-1
@@ -89,8 +88,8 @@ def construct_mol_features(mol: Chem.Mol, out_size: Optional[int]=-1) -> np.ndar
         Where `n` is the total number of atoms within the molecule, and `m` is the number of feats.
     """
     # Caluclate charges and chirality of atoms within molecule
-    AllChem.ComputeGasteigerCharges(mol) # stored under _GasteigerCharge
-    Chem.AssignStereochemistry(mol) # stored under _CIPCode, see doc for more info
+    rdPartialCharges.ComputeGasteigerCharges(mol) # stored under _GasteigerCharge
+    rdmolops.AssignStereochemistry(mol) # stored under _CIPCode, see doc for more info
 
     # Retrieve atom index locations of matches
     hydrogen_donor_match = sum(mol.GetSubstructMatches(HYDROGEN_DONOR), ())
@@ -110,11 +109,11 @@ def construct_mol_features(mol: Chem.Mol, out_size: Optional[int]=-1) -> np.ndar
         atom_feats += one_hot(atom.GetSymbol(), ['C', 'O', 'N', 'S', 'Cl', 'F', 'Br', 'P', 
                                                  'I', 'Si', 'B', 'Na', 'Sn', 'Se', 'other'])
         atom_feats += one_hot(atom.GetDegree(), [1,2,3,4,5,6])
-        atom_feats += one_hot(atom.GetHybridization(), [Chem.rdchem.HybridizationType.SP,
-                                                        Chem.rdchem.HybridizationType.SP2,
-                                                        Chem.rdchem.HybridizationType.SP3,
-                                                        Chem.rdchem.HybridizationType.SP3D,
-                                                        Chem.rdchem.HybridizationType.SP3D2])
+        atom_feats += one_hot(atom.GetHybridization(), [rdchem.HybridizationType.SP,
+                                                        rdchem.HybridizationType.SP2,
+                                                        rdchem.HybridizationType.SP3,
+                                                        rdchem.HybridizationType.SP3D,
+                                                        rdchem.HybridizationType.SP3D2])
         atom_feats += one_hot(atom.GetImplicitValence(), [0, 1, 2, 3, 4, 5, 6])
         atom_feats += one_hot(atom.GetFormalCharge(), [-3, -2, -1, 0, 1, 2, 3])
         atom_feats += [atom.GetProp("_GasteigerCharge")]
@@ -155,7 +154,7 @@ def construct_mol_features(mol: Chem.Mol, out_size: Optional[int]=-1) -> np.ndar
                          'number of atoms in the input molecules (N={}).'.format(out_size, n_atoms))
     
 
-def construct_adj_matrix(mol: Chem.Mol, 
+def construct_adj_matrix(mol: rdchem.Mol, 
                          out_size: Optional[int]=-1, 
                          add_self_loops: Optional[bool]=True,
                          normalize: Optional[bool]=True) -> np.ndarray:
@@ -180,7 +179,7 @@ def construct_adj_matrix(mol: Chem.Mol,
 
     Params:
     -------
-    mol: rdkit.Chem.Mol
+    mol: rdkit.Chem.rdchem.Mol
         Molecule of interest.
 
     out_size: int, optional, default=-1
@@ -228,12 +227,12 @@ def construct_adj_matrix(mol: Chem.Mol,
                          'number of atoms in the input molecules (N={}).'.format(out_size, s1))
 
 
-def construct_pos_matrix(mol: Chem.Mol, out_size: Optional[int]=-1) -> np.ndarray:
+def construct_pos_matrix(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.ndarray:
     """Construct relative positions from each atom within the molecule.
 
     Params:
     -------
-    mol: rdkit.Chem.Mol
+    mol: rdkit.Chem.rdchem.Mol
         Molecule of interest. 
 
     out_size: int, optional, default=-1
@@ -248,6 +247,8 @@ def construct_pos_matrix(mol: Chem.Mol, out_size: Optional[int]=-1) -> np.ndarra
 
     Examples:
     ---------
+    >>> from rdkit import Chem
+    >>> from rdkit.Chem import AllChem
     >>> smiles = 'N[C@@]([H])([C@]([H])(O2)C)C(=O)N[C@@]([H])(CC(=O)N)C(=O)N[C@@]([H])([C@]([H])' \
                  '(O)C)C(=O)N[C@@]([H])(Cc1ccc(O)cc1)C(=O)2'
     >>> mol = Chem.MolFromSmiles(smiles)

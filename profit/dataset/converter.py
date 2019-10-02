@@ -11,11 +11,10 @@ from typing import Tuple, Optional, Any
 import numpy as np
 import pandas as pd
 
-from rdkit import Chem
-from rdkit.Chem import AllChem
+from rdkit.Chem import rdchem, rdDistGeom, rdForceFieldHelpers, rdmolops, rdmolfiles
 
-from profit.utils.io import load_csv, maybe_create_dir
 from profit.cyclops import struct_gen as sg
+from profit.utils.io import load_csv, maybe_create_dir
 
 
 # Setup logging
@@ -90,9 +89,9 @@ def convert_to_smiles(filepath: str,
 
 
 def optimize_coords(idx: int, 
-                    m: Chem.Mol, 
+                    mol: rdchem.Mol, 
                     prop: Any, 
-                    algo: Optional[str]="ETKDG") -> Tuple[Chem.Mol, Any]:
+                    algo: Optional[str]="ETKDG") -> Tuple[rdchem.Mol, Any]:
     """
     Optimize 3D coordinates for each compound. Defines the XYZ positions for each atom in the 
     molecule. 
@@ -117,7 +116,7 @@ def optimize_coords(idx: int,
     idx: int
         Index location of molecule within dataset.
     
-    m: rdkit.Chem.Mol
+    mol: rdkit.Chem.rdchem.Mol
         The molecule to optimize.
     
     prop: Any
@@ -129,51 +128,51 @@ def optimize_coords(idx: int,
 
     Returns:
     --------
-    mol: rdkit.Chem.Mol
+    mol: rdkit.Chem.rdchem.Mol
         Optimized molecule.
 
     prop: Any
         Property associated with the molecule.
     """
-    logger.info("Optimizing coords for compound {0:d} using {1:s}: {2:s}...".format(idx, algo, Chem.MolToSmiles(m)))
+    logger.info("Optimizing coords for compound {0:d} using {1:s}: {2:s}...".format(idx, algo, rdmolfiles.MolToSmiles(mol)))
 
     # Add H's to molecule (with 3D coords)
-    mol = Chem.AddHs(m, addCoords=True)
+    mol = rdmolops.AddHs(mol, addCoords=True)
 
     # Optimize and embed (write) coordinates using one of the defined force fields.
     if algo == "ETKDG":
         # Fast, and accurate conformation generator
-        k = AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+        k = rdDistGeom.EmbedMolecule(mol, rdDistGeom.ETKDG())
         if k != 0:
             return None, None
     elif algo == "UFF":
         # Universal Force Field
-        AllChem.EmbedMultipleConfs(mol, 50, pruneRmsThresh=0.5, numThreads=0)
+        rdDistGeom.EmbedMultipleConfs(mol, 50, pruneRmsThresh=0.5, numThreads=0)
         try:
-            arr = AllChem.UFFOptimizeMoleculeConfs(mol, maxIters=2000, numThreads=0)
+            arr = rdForceFieldHelpers.UFFOptimizeMoleculeConfs(mol, maxIters=2000, numThreads=0)
         except ValueError:
             return None, None
 
         if not arr:
             return None, None
         else:
-            arr = AllChem.UFFOptimizeMoleculeConfs(mol, maxIters=2000, numThreads=0)
+            arr = rdForceFieldHelpers.UFFOptimizeMoleculeConfs(mol, maxIters=2000, numThreads=0)
             idx = np.argmin(arr, axis=0)[1] # get idx of lowest energy conformation
             conf = mol.GetConformers()[idx]
             mol.RemoveAllConformers()
             mol.AddConformer(conf)
     elif algo == "MMFF":
         # Merck Molecular Force Field
-        AllChem.EmbedMultipleConfs(mol, 50, pruneRmsThresh=0.5, numThreads=0)
+        rdDistGeom.EmbedMultipleConfs(mol, 50, pruneRmsThresh=0.5, numThreads=0)
         try:
-            arr = AllChem.MMFFOptimizeMoleculeConfs(mol, maxIters=2000, numThreads=0)
+            arr = rdForceFieldHelpers.MMFFOptimizeMoleculeConfs(mol, maxIters=2000, numThreads=0)
         except ValueError:
             return None, None
 
         if not arr:
             return None, None
         else:
-            arr = AllChem.MMFFOptimizeMoleculeConfs(mol, maxIters=2000, numThreads=0)
+            arr = rdForceFieldHelpers.MMFFOptimizeMoleculeConfs(mol, maxIters=2000, numThreads=0)
             idx = np.argmin(arr, axis=0)[1] # get idx of lowest energy conformation
             conf = mol.GetConformers()[idx]
             mol.RemoveAllConformers()
@@ -183,7 +182,7 @@ def optimize_coords(idx: int,
                          "to optimize the molecule's 3D geometry.".format(algo)) 
 
     # Remove unwanted H's from molecule
-    mol = Chem.RemoveHs(mol)
+    mol = rdmolops.RemoveHs(mol)
     return mol, prop
 
 
@@ -225,13 +224,13 @@ def convert(filepath: str,
         X,y = load_csv(filepath, x_name=x_name, y_name=y_name)
         mols, props = [], []
         for smi, prop in zip(X, y):
-            mol = Chem.MolFromSmiles(smi)
+            mol = rdmolfiles.MolFromSmiles(smi)
             if mol is not None:
                 mols.append(mol)
                 props.append(prop)
         mol_idx = list(range(len(mols)))
     elif ext == '.sdf':
-        mols = Chem.SDMolSupplier(filepath)
+        mols = rdmolfiles.SDMolSupplier(filepath)
         props = [mol.GetProp(y_name) if mol.HasProp(y_name) else None for mol in mols]
         mol_idx = list(range(len(mols)))
     else:
@@ -254,7 +253,7 @@ def convert(filepath: str,
     
     # Save coordinates to file
     save_path = maybe_create_dir(save_path)
-    writer = Chem.SDWriter(save_path)
+    writer = rdmolfiles.SDWriter(save_path)
     for m in mol_list: writer.write(m)
     writer.close()
     logger.info('Saved {0:d} molecules to `{1:s}`'.format(len(mol_list), save_path))

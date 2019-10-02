@@ -1,7 +1,7 @@
 import numpy as np
 
-from profit.dataset.splitters.base_splitter import BaseSplitter
 from typing import Any, Dict, Optional, Tuple, Union
+from profit.dataset.splitters.base_splitter import BaseSplitter
 
 
 class RandomSplitter(BaseSplitter):

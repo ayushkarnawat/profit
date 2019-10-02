@@ -70,6 +70,8 @@ def generate(save_path: str, n: Optional[int]=4) -> None:
     df.to_csv(save_path, sep=',', header=True, index=False, columns=['ID', 'Variants', 'Fitness'])
     logger.info('Saved generated variants to {0:s}'.format(save_path))
 
+
 if __name__ == "__main__":
     n=4
     generate('data/raw/variants{}.csv'.format(20**n), n=n)
+    

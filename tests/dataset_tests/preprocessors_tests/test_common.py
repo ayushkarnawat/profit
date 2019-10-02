@@ -1,25 +1,24 @@
 import pytest
 import numpy as np
 
-from rdkit import Chem
-from rdkit.Chem import AllChem
+from rdkit.Chem import rdmolops, rdmolfiles, rdDistGeom
 from profit.dataset.preprocessors import common
 
 
 @pytest.fixture
 def sample_mol():
-    mol = Chem.MolFromSmiles('CN=C=O')
-    mol = Chem.AddHs(mol, addCoords=True)
-    AllChem.EmbedMolecule(mol, AllChem.ETKDG())
-    return Chem.RemoveHs(mol)
+    mol = rdmolfiles.MolFromSmiles('CN=C=O')
+    mol = rdmolops.AddHs(mol, addCoords=True)
+    rdDistGeom.EmbedMolecule(mol, rdDistGeom.ETKDG())
+    return rdmolops.RemoveHs(mol)
 
 
 @pytest.fixture
 def sample_mol2():
-    mol = Chem.MolFromSmiles('Cc1ccccc1')
-    mol = Chem.AddHs(mol, addCoords=True)
-    AllChem.EmbedMolecule(mol, AllChem.ETKDG())
-    return Chem.RemoveHs(mol)
+    mol = rdmolfiles.MolFromSmiles('Cc1ccccc1')
+    mol = rdmolops.AddHs(mol, addCoords=True)
+    rdDistGeom.EmbedMolecule(mol, rdDistGeom.ETKDG())
+    return rdmolops.RemoveHs(mol)
 
 
 class TestGetAdjMatrix(object):
@@ -66,4 +65,4 @@ class TestGetAdjMatrix(object):
 
     def test_normal_truncated(self, sample_mol2):
         with pytest.raises(ValueError):
-            adj = common.construct_adj_matrix(sample_mol2, out_size=4)
+            _ = common.construct_adj_matrix(sample_mol2, out_size=4)

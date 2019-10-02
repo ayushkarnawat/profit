@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 
-from profit.dataset.splitters.base_splitter import BaseSplitter
 from typing import Any, Dict, Optional, Tuple, Union
+from profit.dataset.splitters.base_splitter import BaseSplitter
 
 
 def _approximate_mode(class_counts: np.ndarray, n_draws: int) -> np.ndarray:
