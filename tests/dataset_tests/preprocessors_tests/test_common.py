@@ -5,12 +5,14 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from profit.dataset.preprocessors import common
 
+
 @pytest.fixture
 def sample_mol():
     mol = Chem.MolFromSmiles('CN=C=O')
     mol = Chem.AddHs(mol, addCoords=True)
     AllChem.EmbedMolecule(mol, AllChem.ETKDG())
     return Chem.RemoveHs(mol)
+
 
 @pytest.fixture
 def sample_mol2():

@@ -1,10 +1,8 @@
-
-from typing import Any, List, Optional
-
 import numpy as np
 
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdmolops
+from typing import Any, List, Optional
 
 
 HYDROGEN_DONOR = Chem.MolFromSmarts("[$([N;!H0;v3,v4&+1]),$([O,S;H1;+0]),n&H1&+0]")
