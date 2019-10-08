@@ -6,6 +6,8 @@ remove:
 	find . | grep -E "(__pycache__|\.pyc)" | xargs rm -rf
 
 install:
+	# Update package dependences
+	conda list -e > requirements.txt
 	python setup.py install
 
 rebuild: 
