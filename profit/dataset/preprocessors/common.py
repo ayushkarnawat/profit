@@ -1,15 +1,15 @@
 import numpy as np
 
 from typing import Any, List, Optional
-from rdkit.Chem import rdchem, rdmolops, rdPartialCharges
+from rdkit.Chem import rdchem, rdmolfiles, rdmolops, rdPartialCharges
 
 
-HYDROGEN_DONOR = rdchem.MolFromSmarts("[$([N;!H0;v3,v4&+1]),$([O,S;H1;+0]),n&H1&+0]")
-HYROGEN_ACCEPTOR = rdchem.MolFromSmarts("[$([O,S;H1;v2;!$(*-*=[O,N,P,S])]),$([O,S;H0;v2]),$([O" + 
+HYDROGEN_DONOR = rdmolfiles.MolFromSmarts("[$([N;!H0;v3,v4&+1]),$([O,S;H1;+0]),n&H1&+0]")
+HYROGEN_ACCEPTOR = rdmolfiles.MolFromSmarts("[$([O,S;H1;v2;!$(*-*=[O,N,P,S])]),$([O,S;H0;v2]),$([O" + 
                                         ",S;-]),$([N;v3;!$(N-*=[O,N,P,S])]),n&H0&+0,$([o,s;+0;" + 
                                         "!$([o,s]:n);!$([o,s]:c:n)])]")
-ACIDIC = rdchem.MolFromSmarts("[$([C,S](=[O,S,P])-[O;H1,-1])]")
-BASIC = rdchem.MolFromSmarts("[#7;+,$([N;H2&+0][$([C,a]);!$([C,a](=O))]),$([N;H1&+0]([$([C,a])" + 
+ACIDIC = rdmolfiles.MolFromSmarts("[$([C,S](=[O,S,P])-[O;H1,-1])]")
+BASIC = rdmolfiles.MolFromSmarts("[#7;+,$([N;H2&+0][$([C,a]);!$([C,a](=O))]),$([N;H1&+0]([$([C,a])" + 
                              ";!$([C,a](=O))])[$([C,a]);!$([C,a](=O))]),$([N;H0&+0]([C;!$(C(=O" + 
                              "))])([C;!$(C(=O))])[C;!$(C(=O))])]")
 

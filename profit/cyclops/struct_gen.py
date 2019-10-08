@@ -1,27 +1,30 @@
-'''Module containing functions for combinatorial generation of lists of 
-constrained and unconstrained peptides, for producing the approriate SMILES
- string, and using openbabel to generate a 3D structure (pdb, sdf, etc) from the 
- SMILES
+"""
+Module allowing for (a) combinatorial generation of lists of constrained/unconstrained peptides, 
+and (b) for producing the approriate SMILES string.
 
-All peptide sequences are handled as a string of 1 letter residue codes
+All peptide sequences are handled as a string of 1 letter residue codes.
 
-Author:Fergal Duffy. email:fergaljd@gmail.com
+Created by Fergal Duffy (fergaljd@gmail.com)
+Modified by Ayush Karnawat
+"""
 
-Requires python 2.6 or better
-
-Recommended to import with:
-from PepLibGen.StructGen import StructGen as sg
-
-'''
-
-import os
-import os.path as path
-
-import sys
 import operator
 import itertools
 
+try:
+    from rdkit.Chem import rdmolfiles, rdmolops
+except ImportError as e:
+    print(e)
+
 from profit.cyclops.aminoacids import aminos, special_aminos, d_aminos
+
+
+class NoCysteineError(Exception): pass   
+class BondSpecError(Exception): pass
+class FormatError(Exception): pass
+class UndefinedAminoError(Exception): pass
+class UndefinedPropertyError(Exception): pass
+class SmilesError(Exception): pass
 
 # All aminos - a combined dictionary of all defined amino acids
 all_aminos = {}
@@ -31,21 +34,7 @@ for amino_dict in [aminos, special_aminos, d_aminos]:
 # Default - a copy of all_aminos
 aminodata = dict(all_aminos)
 
-try:
-    from rdkit import Chem
-    from rdkit.Chem import AllChem
-except ImportError as e:
-    print(e)
 
-     
-class NoCysteineError(Exception): pass   
-class BondSpecError(Exception): pass
-class FormatError(Exception): pass
-class UndefinedAminoError(Exception): pass
-class UndefinedPropertyError(Exception): pass
-class SmilesError(Exception): pass
-
-          
 def add_amino(name):
     '''
     If an amino acid is defined in aminoacids.py, add it to aminodata list.
@@ -469,15 +458,15 @@ def nmethylate_peptide_smiles(smiles):
     Input a peptide smiles string.
     Returns a smiles string with all backbone nitrogens and the n-terminus
     methylated.'''
-    mol = Chem.MolFromSmiles(smiles)
+    mol = rdmolfiles.MolFromSmiles(smiles)
     #Pattern to find N molecules in a peptide bond or at the N-terminus.
     #N molecule must have a free H, ignore Proline N-termini in
     #middle of sequences
-    n_pattern = Chem.MolFromSmarts("[$([Nh1](C)C(=O)),$([NH2]CC=O)]")
-    methylated_pattern = Chem.MolFromSmarts("N(C)")
-    rmol = AllChem.ReplaceSubstructs(mol, n_pattern, methylated_pattern, 
+    n_pattern = rdmolfiles.MolFromSmarts("[$([Nh1](C)C(=O)),$([NH2]CC=O)]")
+    methylated_pattern = rdmolfiles.MolFromSmarts("N(C)")
+    rmol = rdmolops.ReplaceSubstructs(mol, n_pattern, methylated_pattern, 
         replaceAll=True)
-    return Chem.MolToSmiles(rmol[0], isomericSmiles=True) 
+    return rdmolfiles.MolToSmiles(rmol[0], isomericSmiles=True) 
 
 def nmethylate_peptides(structs):
      '''Wrapper for nmethylate_peptide_smiles to use when passing in peptide

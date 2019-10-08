@@ -6,18 +6,8 @@ except ImportError:
     import csv
 
 import os
-import logging
 import numpy as np
 from typing import Tuple
-
-
-# Setup logging
-logger = logging.getLogger()
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s  %(levelname)-8s %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
 
 
 def load_csv(filepath: str, 
@@ -78,7 +68,7 @@ def maybe_create_dir(path: str) -> str:
     save_path = os.path.expanduser(path)
     save_dir, _ = os.path.split(save_path)
     if not os.path.exists(save_dir):
-        logger.info('Creating directory `{0:s}`'.format(save_dir))
+        print('Creating directory `{0:s}`'.format(save_dir))
         os.makedirs(save_dir)
     return save_path
     
