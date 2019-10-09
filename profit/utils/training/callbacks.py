@@ -1,4 +1,4 @@
-from keras.backend import K
+import keras.backend as K
 from keras.callbacks import TensorBoard
 
 class XTensorBoard(TensorBoard):

@@ -4,7 +4,7 @@ from setuptools import find_packages
 
 setup(name='profit',
       version='0.1dev',
-      description='Protein Fitness: Determine protein evolutionary fitness',
+      description='Protein Fitness: Determine evolutionary protein fitness',
       author = 'Ayush Karnawat',
       author_email='ayushkarnawat@gmail.com',
       packages=find_packages(),
