@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class GraphGather(Layer):
-    """Combines both scalar and vector features into similar representations.
+    """Combines both scalar and vector features into similar representations. Essentially, like a 
+    concatination layer.
     
     Params:
     -------

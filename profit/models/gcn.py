@@ -1,4 +1,3 @@
-
 from keras.layers import Add, Concatenate, Dense, Dropout, Flatten, Input, TimeDistributed
 from keras.models import Model
 from keras.optimizers import Adam
@@ -15,11 +14,44 @@ from typing import Optional
 
 class GCN(object):
     """Graph Convolution Network.
-
-    Num of outputs can be automatically inferred from the label names, if the task is multitask or not. 
     
     task type can be automatically determined from the type of data. If it is a float or int...classification or regression.
-    Should this be handled by this, or by the trainer class?????? Well, if its handled in this, it has to be determined by every single model, which means it needs to be impemented over and over, which is wrong. Rather, 
+    Should this be handled by this, or by the trainer class?????? Well, if its handled in this, it has to be determined by every single model, which means it needs to be impemented over and over, which is wrong. Rather, we can just determine it in the trainer class, which will make it easier to implement other models.
+
+    Params:
+    -------
+    num_atoms: int
+        Max number of atoms in a molecule.
+
+    num_feats: int
+        Number of features per atom in the molecule.
+
+    num_outputs: int
+        Number of outputs. This is simply the number of labels.
+
+    units_conv: int, optional, default=128
+        Number of filters/units to use in the convolution layer(s).
+
+    units_dense: int, optional, default=128
+        Number of filters/units to use in the fully connected layer(s).
+
+    num_layers: int, optional, default=2
+        Total number of graph convolution layer(s).
+
+    task: str, optional, default='regression'
+        Whether the task is classification (binary or multi-label) or regression-based. 
+
+    loss: str, optional, default="mse"
+        Loss function. See keras.losses for list of all available losses.
+
+    pooling: str, optional, default="max"
+        Type of down-sample pooling technique to perform on the hidden representations after the 
+        graph convolutions. The representations are either summed, averaged, or maxed depending 
+        on the pooling type chosen.
+
+    std: float or None, optional, default=None
+        Standard deviation of the dataset. If regression-based task, then a std must be provided, 
+        which is usually the standard deviation of the training dataset.
     """
 
     def __init__(self, 
@@ -29,10 +61,10 @@ class GCN(object):
                  units_conv: Optional[int]=128, 
                  units_dense: Optional[int]=128, 
                  num_layers: Optional[int]=2, 
-                 task: Optional[str]='regression',
+                 task: Optional[str]="regression",
                  loss: Optional[str]="mse", 
                  pooling: Optional[str]="max", 
-                 std: Optional[float]=1.0):
+                 std: Optional[float]=None):
         self.num_atoms = num_atoms
         self.num_feats = num_feats
         self.num_outputs = num_outputs
@@ -42,7 +74,13 @@ class GCN(object):
         self.task = task
         self.loss = loss
         self.pooling = pooling
-        self.std = std
+
+        if self.task == 'regression':
+            if std is not None:
+                self.std = std
+            else:
+                raise ValueError("Standard deviation of the dataset must be provided for "
+                                 "regression tasks.")
         
 
     def get_model(self) -> Model:
@@ -84,8 +122,11 @@ class GCN(object):
         if self.task == "regression":
             out = Dense(self.num_outputs, activation='linear', name='output')(out)
             model = Model(inputs=[atoms, adjms, dists], outputs=out)
-            model.compile(optimizer=Adam(lr=0.001), loss=self.loss, 
-                          metrics=[std_mae(std=self.std), std_rmse(std=self.std)])
+            model.compile(optimizer=Adam(lr=0.001), 
+                          loss=self.loss, 
+                          metrics=[std_mae(std=self.std), 
+                                   std_rmse(std=self.std), 
+                                   std_r2(std=self.std)])
         elif self.task == "binary":
             out = Dense(self.num_outputs, activation='sigmoid', name='output')(out)
             model = Model(inputs=[atoms, adjms, dists], outputs=out)
@@ -98,3 +139,4 @@ class GCN(object):
             raise ValueError("Unsupported task on model generation.")
         
         return model
+        
