@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 from rdkit.Chem import rdchem, rdmolfiles, rdmolops
 
 class BasePreprocessor(object):
@@ -47,7 +47,8 @@ class BasePreprocessor(object):
         return canonical_smiles, mol
 
     
-    def get_labels(self, mol: rdchem.Mol, label_names: Optional[List[str]]=None) -> List[str]:
+    def get_labels(self, mol: rdchem.Mol, 
+                   label_names: Optional[Union[str, List[str]]]=None) -> List[str]:
         """Extract corresponding label info from the molecule.
         
         Params:
@@ -55,7 +56,7 @@ class BasePreprocessor(object):
         mol: rdkit.Chem.rdchem.Mol
             Molecule of interest.
 
-        label_names: list of str or None, optional, default=None
+        label_names: str or list of str or None, optional, default=None
             Name of labels.
 
         Returns:
@@ -65,7 +66,24 @@ class BasePreprocessor(object):
         """
         if label_names is None:
             return []
-        return [mol.GetProp(name) if mol.HasProp(name) else None for name in label_names]
+
+        # Convert str to list for proper parsing
+        if isinstance(label_names, str):
+            label_names = [label_names]
+
+        # # Extract labels and convert to float if num
+        # labels = []
+        # for name in label_names:
+        #     if mol.HasProp(name):
+        #         val = mol.GetProp(name)
+        #         if val.replace('.', '', 1).isdigit():
+        #             labels.append(float(val))
+        #         else:
+        #             labels.append(val)
+        #     else:
+        #         labels.append(None)
+        # return labels
+        return [float(mol.GetProp(name)) if mol.HasProp(name) else None for name in label_names]
     
 
     def get_input_feats(self, mol: rdchem.Mol):
