@@ -269,7 +269,7 @@ def construct_pos_matrix(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.ndar
     # Determine appropiate output size to generate feature matrix of same size for all mols.
     if out_size < 0:
         size = N
-    elif out_size > N:
+    elif out_size >= N:
         size = out_size
     else:
         raise ValueError('`out_size` (N={}) is smaller than number of atoms in mol (N={})'.
