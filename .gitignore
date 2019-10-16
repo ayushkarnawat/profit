@@ -112,3 +112,4 @@ venv.bak/
 # project specific
 data/interim/**
 data/processed/**
+data/tmp/**

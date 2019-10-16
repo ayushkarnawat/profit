@@ -75,9 +75,9 @@ def test_regression_split(reg_dataset):
     assert train.shape[0] == 80
     assert valid.shape[0] == 10
     assert test.shape[0] == 10
-    assert 4.5 < train[:, -1].mean() < 5.5
-    assert 4.5 < valid[:, -1].mean() < 5.5
-    assert 4.5 < test[:, -1].mean() < 5.5
+    assert 4.25 < train[:, -1].mean() < 5.75
+    assert 4.25 < valid[:, -1].mean() < 5.75
+    assert 4.25 < test[:, -1].mean() < 5.75
 
     # Split using 0.5 for train, 0.3 for val, and 0.2 for test
     train, valid, test = splitter.train_valid_test_split(reg_dataset, frac_train=0.5, frac_val=0.3, 
@@ -86,7 +86,7 @@ def test_regression_split(reg_dataset):
     assert train.shape[0] == 50
     assert valid.shape[0] == 30
     assert test.shape[0] == 20
-    assert 4.5 < train[:, -1].mean() < 5.5
-    assert 4.5 < valid[:, -1].mean() < 5.5
-    assert 4.5 < test[:, -1].mean() < 5.5
+    assert 4.25 < train[:, -1].mean() < 5.75
+    assert 4.25 < valid[:, -1].mean() < 5.75
+    assert 4.25 < test[:, -1].mean() < 5.75
     

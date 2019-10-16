@@ -126,11 +126,3 @@ class RandomSplitter(BaseSplitter):
         """
         return super(RandomSplitter, self).train_valid_split(dataset, frac_train, frac_val, 
                                                              return_idxs, seed=seed, **kwargs)
-
-
-if __name__ == "__main__":
-    X = np.random.random(size=(10,2))
-    splitter  = RandomSplitter()
-    X_train, X_val = splitter.train_valid_split(X, frac_train=0.8, frac_val=0.2, return_idxs=False, seed=None)
-    print(X_train.shape, X_val.shape)
-    
