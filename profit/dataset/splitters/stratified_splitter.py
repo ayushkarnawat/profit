@@ -105,7 +105,7 @@ class StratifiedSplitter(BaseSplitter):
             labels = np.array(labels)
         elif labels is None: # if the labels are combined with the data matrix X
             label_axis = kwargs.get('label_axis', -1) # column index of labels, useful if training for multitask 
-            labels = dataset[:, label_axis]
+            labels = dataset[..., label_axis]
 
         # Checks if the label values are all int type. Ensures that the label axis is correctly 
         # typed to determine downstream training task (i.e. classification or regression). 

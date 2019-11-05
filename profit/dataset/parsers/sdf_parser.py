@@ -49,7 +49,7 @@ class SDFFileParser(BaseFileParser):
         Returns:
         --------
         out: dict
-
+            Extracted features (aka dataset) and associated smiles of requested mol.  
         """
         smiles_list = []
         pp = self.preprocessor
@@ -121,16 +121,3 @@ class SDFFileParser(BaseFileParser):
         
         all_smiles = np.array(smiles_list) if return_smiles else None
         return {"dataset": all_feats, "smiles": all_smiles}
-
-
-if __name__ == "__main__":
-    from profit.dataset.preprocessors.gcn_preprocessor import GCNPreprocessor
-    preprocessor = GCNPreprocessor(max_atoms=49, out_size=49)
-    parser = SDFFileParser(preprocessor)
-    result = parser.parse("data/processed/fitness570-constraints=1-algo=ETKDG.sdf", 
-                          return_smiles=True, target_index=[0,2])
-    dataset = result['dataset']
-    smiles = result['smiles']
-    print(len(dataset))
-    print(dataset[0].shape, dataset[1].shape, dataset[2].shape)
-    print(smiles)

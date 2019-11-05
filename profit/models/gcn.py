@@ -1,3 +1,5 @@
+from typing import Optional
+
 from keras.layers import Add, Concatenate, Dense, Dropout, Flatten, Input, TimeDistributed
 from keras.models import Model
 from keras.optimizers import Adam
@@ -8,8 +10,6 @@ from profit.layers.embed import GraphEmbed
 from profit.layers.gather import GraphGather
 from profit.layers.nodes import GraphSToS, GraphSToV, GraphVToS, GraphVToV
 from profit.utils.training.loss import std_mae, std_rmse, std_r2
-
-from typing import Optional
 
 
 class GCN(object):
@@ -54,16 +54,10 @@ class GCN(object):
         which is usually the standard deviation of the training dataset.
     """
 
-    def __init__(self, 
-                 num_atoms: int, 
-                 num_feats: int, 
-                 num_outputs: int,
-                 units_conv: Optional[int]=128, 
-                 units_dense: Optional[int]=128, 
-                 num_layers: Optional[int]=2, 
-                 task: Optional[str]="regression",
-                 loss: Optional[str]="mse", 
-                 pooling: Optional[str]="max", 
+    def __init__(self, num_atoms: int, num_feats: int, num_outputs: int,
+                 units_conv: Optional[int]=128, units_dense: Optional[int]=128, 
+                 num_layers: Optional[int]=2, task: Optional[str]="regression",
+                 loss: Optional[str]="mse", pooling: Optional[str]="max", 
                  std: Optional[float]=None):
         self.num_atoms = num_atoms
         self.num_feats = num_feats
