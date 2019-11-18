@@ -9,7 +9,7 @@ from typing import List, Union
 class AminoAcidGeometry(ABC):
     """Base class for amino acid geometry."""
 
-    def __init__(self):
+    def __init__(self):        
         # Bond lengths
         self.Ca_N_length = 1.46
         self.Ca_C_length = 1.52
@@ -31,6 +31,12 @@ class AminoAcidGeometry(ABC):
         common_diangles = ['N_Ca_C_O_diangle', 'N_C_Ca_Cb_diangle']
         all_diangles = [var for var in self.__dict__.keys() if 'diangle' in var.lower()]
         self.extra_diangles = list(filter(lambda angle: angle not in common_diangles, all_diangles))
+
+    
+    def __repr__(self):
+        # Exclude member functions, only print variables and their values
+        out = ["{0:} = {1:}".format(var, value) for var, value in self.__dict__.items()]
+        return "\n".join(out)
 
 
     def set_rotamer_dihedrals(self, angles: Union[str, List[float]]="random") -> None:
@@ -55,12 +61,6 @@ class AminoAcidGeometry(ABC):
         for idx, var in enumerate(self.extra_diangles):
             self.__dict__[var] = angles[idx]
     
-    
-    def __repr__(self):
-        # Exclude member functions, only print variables and their values
-        out = ["{0:} = {1:}".format(var, value) for var, value in self.__dict__.items()]
-        return "\n".join(out)
-
 
 class GlyGeometry(AminoAcidGeometry):
     """Glycine geometry."""
@@ -85,7 +85,7 @@ class AlaGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "A"
-        self.full_name = "Ala"
+        self.full_name = "ALA"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 111.068
@@ -107,7 +107,7 @@ class SerGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "S"
-        self.full_name = "Ser"
+        self.full_name = "SER"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 111.2812
@@ -133,7 +133,7 @@ class CysGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "C"
-        self.full_name = "Cys"
+        self.full_name = "CYS"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 110.8856 
@@ -159,7 +159,7 @@ class ValGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "V"
-        self.full_name = "Val"
+        self.full_name = "VAL"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 109.7698
@@ -189,7 +189,7 @@ class IleGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "I"
-        self.full_name = "Ile"
+        self.full_name = "ILE"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 109.7202
@@ -223,7 +223,7 @@ class LeuGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "L"
-        self.full_name = "Leu"
+        self.full_name = "LEU"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 110.8652 
@@ -257,7 +257,7 @@ class ThrGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "T"
-        self.full_name = "Thr"
+        self.full_name = "THR"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 110.7014
@@ -287,7 +287,7 @@ class ArgGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "R"
-        self.full_name = "Arg"
+        self.full_name = "ARG"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 110.98
@@ -333,7 +333,7 @@ class LysGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "K"
-        self.full_name = "Lys"
+        self.full_name = "LYS"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 111.08
@@ -371,7 +371,7 @@ class AspGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "D"
-        self.full_name = "Asp"
+        self.full_name = "ASP"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 111.03
@@ -405,7 +405,7 @@ class AsnGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "N"
-        self.full_name = "Asn"
+        self.full_name = "ASN"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 111.5
@@ -439,7 +439,7 @@ class GluGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "E"
-        self.full_name = "Glu"
+        self.full_name = "GLU"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 111.1703
@@ -477,7 +477,7 @@ class GlnGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "Q"
-        self.full_name = "Gln"
+        self.full_name = "GLN"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 111.0849
@@ -515,7 +515,7 @@ class MetGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "M"
-        self.full_name = "Met"
+        self.full_name = "MET"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 110.9416
@@ -549,7 +549,7 @@ class HisGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "H"
-        self.full_name = "His"
+        self.full_name = "HIS"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle = 111.0859
@@ -591,7 +591,7 @@ class ProGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "P"
-        self.full_name = "Pro"
+        self.full_name = "PRO"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle=112.7499
@@ -621,7 +621,7 @@ class PheGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "F"
-        self.full_name = "Phe"
+        self.full_name = "PHE"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle=110.7528
@@ -667,7 +667,7 @@ class TyrGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "Y"
-        self.full_name = "Tyr"
+        self.full_name = "TYR"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle=110.9288
@@ -717,7 +717,7 @@ class TrpGeometry(AminoAcidGeometry):
 
     def __init__(self):
         self.residue_name = "W"
-        self.full_name = "Trp"
+        self.full_name = "TRP"
 
         # Amino acid specific bonds, angles, and dihedrals
         self.N_Ca_C_angle=110.8914
@@ -770,7 +770,7 @@ class TrpGeometry(AminoAcidGeometry):
         super(TrpGeometry, self).__init__()
 
 
-AA_geometries = {
+aa_geometries = {
     "G": GlyGeometry(),
     "A": AlaGeometry(),
     "S": SerGeometry(),
