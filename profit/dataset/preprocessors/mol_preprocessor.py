@@ -17,6 +17,7 @@ class MolPreprocessor(BasePreprocessor):
     """
 
     def __init__(self, add_Hs: Optional[bool]=False, kekulize: Optional[bool]=False) -> None:
+        super(MolPreprocessor, self).__init__()
         self.add_Hs = add_Hs
         self.kekulize = kekulize
 
@@ -59,7 +60,7 @@ class MolPreprocessor(BasePreprocessor):
             Molecule of interest.
 
         label_names: str or list of str or None, optional, default=None
-            Name of labels.
+            Name of label(s).
 
         Returns:
         --------
