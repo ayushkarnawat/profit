@@ -17,6 +17,7 @@ class MolPreprocessor(BasePreprocessor):
     """
 
     def __init__(self, add_Hs: Optional[bool]=False, kekulize: Optional[bool]=False) -> None:
+        super(MolPreprocessor, self).__init__()
         self.add_Hs = add_Hs
         self.kekulize = kekulize
 

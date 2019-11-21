@@ -39,7 +39,7 @@ def one_hot(x: Any, allowable_set: List[Any]) -> List[int]:
     return list(map(lambda s: int(x == s), allowable_set))
 
 
-def check_num_atoms(mol: rdchem.Mol, max_num_atoms: Optional[int]=-1):
+def check_num_atoms(mol: rdchem.Mol, max_num_atoms: Optional[int]=-1) -> None:
     """Check number of atoms in `mol` does not exceed `max_num_atoms`.
 
     If number of atoms in `mol` exceeds the number `max_num_atoms`, it will
@@ -55,7 +55,7 @@ def check_num_atoms(mol: rdchem.Mol, max_num_atoms: Optional[int]=-1):
     """
     num_atoms = mol.GetNumAtoms()
     if max_num_atoms >= 0 and num_atoms > max_num_atoms:
-        raise MolFeatureExtractionError('Atoms in mol (N={}) exceeds num_max_atoms (N={})' \
+        raise MolFeatureExtractionError('Atoms in mol (N={}) exceeds num_max_atoms (N={}).' \
             .format(num_atoms, max_num_atoms))
 
 
@@ -196,7 +196,7 @@ def construct_adj_matrix(mol: rdchem.Mol,
     Returns:
     --------
     adj: np.ndarray
-        Adjacency matrix of input molecule. If ``out_size`` is non-negative, the returned matrix 
+        Adjacency matrix of input molecule. If `out_size` is non-negative, the returned matrix 
         is equal to that value. Otherwise, it is equal to the number of atoms in the the molecule.
     """
     adj = rdmolops.GetAdjacencyMatrix(mol)
