@@ -15,7 +15,7 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s  %(levelname)-8s %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 def gen(n: Optional[int]=4) -> np.ndarray:
@@ -59,7 +59,7 @@ def generate(save_path: str, n: Optional[int]=4) -> None:
         Length of the sequence.
     """
     seqs = gen(n)
-    n_total = seqs.shape[0]
+    n_total = seqs[:].shape[0]
     df = pd.DataFrame({'ID': np.arange(n_total), 
                        'Variants': seqs, 
                        'Fitness': ['' for _ in range(n_total)] # TODO: should it be 0. or ''?

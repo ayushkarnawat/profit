@@ -93,8 +93,8 @@ def construct_embedding(seq: Union[str, List[str]],
         raise NotImplementedError
     
     # Pad (w/ unknown value) to defined size
-    full_size = [size] + list(embedding.shape[1:])
-    pad_width = [(0, full_size[i] - embedding.shape[i]) for i in range(embedding.ndim)]
+    full_size = [size] + list(embedding[:].shape[1:])
+    pad_width = [(0, full_size[i] - embedding[:].shape[i]) for i in range(embedding.ndim)]
     padded_embed = np.pad(embedding, pad_width, mode="constant", constant_values=AA_DICT.get("X"))
     return padded_embed
     
