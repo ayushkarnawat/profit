@@ -15,10 +15,6 @@ rebuild:
 	@make remove
 	@make install
 
-dataset:
-	# Make dataset, allowing for constraints (`-c` command) within molecules
-	python scripts/make_dataset.py --raw_path data/raw/fitness570.csv -c -n 2 -a ETKDG
-
 run: 
 	@make install
 	pytest -vv

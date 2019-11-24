@@ -4,16 +4,6 @@ from typing import Any, List, Optional
 from rdkit.Chem import rdchem, rdmolfiles, rdmolops, rdPartialCharges
 
 
-HYDROGEN_DONOR = rdmolfiles.MolFromSmarts("[$([N;!H0;v3,v4&+1]),$([O,S;H1;+0]),n&H1&+0]")
-HYROGEN_ACCEPTOR = rdmolfiles.MolFromSmarts("[$([O,S;H1;v2;!$(*-*=[O,N,P,S])]),$([O,S;H0;v2]),$([O" + 
-                                        ",S;-]),$([N;v3;!$(N-*=[O,N,P,S])]),n&H0&+0,$([o,s;+0;" + 
-                                        "!$([o,s]:n);!$([o,s]:c:n)])]")
-ACIDIC = rdmolfiles.MolFromSmarts("[$([C,S](=[O,S,P])-[O;H1,-1])]")
-BASIC = rdmolfiles.MolFromSmarts("[#7;+,$([N;H2&+0][$([C,a]);!$([C,a](=O))]),$([N;H1&+0]([$([C,a])" + 
-                             ";!$([C,a](=O))])[$([C,a]);!$([C,a](=O))]),$([N;H0&+0]([C;!$(C(=O" + 
-                             "))])([C;!$(C(=O))])[C;!$(C(=O))])]")
-
-
 class MolFeatureExtractionError(Exception):
     pass
 
@@ -49,7 +39,7 @@ def one_hot(x: Any, allowable_set: List[Any]) -> List[int]:
     return list(map(lambda s: int(x == s), allowable_set))
 
 
-def check_num_atoms(mol: rdchem.Mol, max_num_atoms: Optional[int]=-1):
+def check_num_atoms(mol: rdchem.Mol, max_num_atoms: Optional[int]=-1) -> None:
     """Check number of atoms in `mol` does not exceed `max_num_atoms`.
 
     If number of atoms in `mol` exceeds the number `max_num_atoms`, it will
@@ -65,7 +55,7 @@ def check_num_atoms(mol: rdchem.Mol, max_num_atoms: Optional[int]=-1):
     """
     num_atoms = mol.GetNumAtoms()
     if max_num_atoms >= 0 and num_atoms > max_num_atoms:
-        raise MolFeatureExtractionError('Atoms in mol (N={}) exceeds num_max_atoms (N={})' \
+        raise MolFeatureExtractionError('Atoms in mol (N={}) exceeds num_max_atoms (N={}).' \
             .format(num_atoms, max_num_atoms))
 
 
@@ -92,6 +82,14 @@ def construct_mol_features(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.nd
     rdmolops.AssignStereochemistry(mol) # stored under _CIPCode, see doc for more info
 
     # Retrieve atom index locations of matches
+    HYDROGEN_DONOR = rdmolfiles.MolFromSmarts("[$([N;!H0;v3,v4&+1]),$([O,S;H1;+0]),n&H1&+0]")
+    HYROGEN_ACCEPTOR = rdmolfiles.MolFromSmarts("[$([O,S;H1;v2;!$(*-*=[O,N,P,S])]),$([O,S;H0;" + 
+                                                "v2]),$([O,S;-]),$([N;v3;!$(N-*=[O,N,P,S])])," + 
+                                                "n&H0&+0,$([o,s;+0;!$([o,s]:n);!$([o,s]:c:n)])]")
+    ACIDIC = rdmolfiles.MolFromSmarts("[$([C,S](=[O,S,P])-[O;H1,-1])]")
+    BASIC = rdmolfiles.MolFromSmarts("[#7;+,$([N;H2&+0][$([C,a]);!$([C,a](=O))]),$([N;H1&+0]" + 
+                                     "([$([C,a]);!$([C,a](=O))])[$([C,a]);!$([C,a](=O))]),$" + 
+                                     "([N;H0&+0]([C;!$(C(=O))])([C;!$(C(=O))])[C;!$(C(=O))])]")
     hydrogen_donor_match = sum(mol.GetSubstructMatches(HYDROGEN_DONOR), ())
     hydrogen_acceptor_match = sum(mol.GetSubstructMatches(HYROGEN_ACCEPTOR), ())
     acidic_match = sum(mol.GetSubstructMatches(ACIDIC), ())
@@ -198,7 +196,7 @@ def construct_adj_matrix(mol: rdchem.Mol,
     Returns:
     --------
     adj: np.ndarray
-        Adjacency matrix of input molecule. If ``out_size`` is non-negative, the returned matrix 
+        Adjacency matrix of input molecule. If `out_size` is non-negative, the returned matrix 
         is equal to that value. Otherwise, it is equal to the number of atoms in the the molecule.
     """
     adj = rdmolops.GetAdjacencyMatrix(mol)
@@ -282,3 +280,4 @@ def construct_pos_matrix(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.ndar
             neigh_pos = coords[neighbor_idx] # neighboring atom
             pos_matrix[atom_idx, neighbor_idx] = atom_pos - neigh_pos # dist between neighbor -> center
     return pos_matrix
+    
