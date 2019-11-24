@@ -6,8 +6,10 @@ from tqdm import tqdm
 from rdkit.Chem import rdmolfiles
 
 from profit.dataset.parsers.base_parser import BaseFileParser
-from profit.dataset.preprocessors.base import BasePreprocessor
 from profit.dataset.preprocessing.mol_feats import MolFeatureExtractionError
+from profit.dataset.preprocessing.mutator import PDBMutator
+from profit.dataset.preprocessors.base import BasePreprocessor
+from profit.dataset.preprocessors.mol_preprocessor import MolPreprocessor
 
 
 class SDFFileParser(BaseFileParser):
@@ -18,19 +20,28 @@ class SDFFileParser(BaseFileParser):
     preprocessor: BasePreprocessor
         Preprocessor instance.
 
+    mutator: PDBMutator or None, optional, default=None
+        Mutator instance. Used to check if mutation type is compatible 
+        with preprocessor instance.
+
     labels: str or list of str or None, optional, default=None
         Label column(s).
     """
 
     def __init__(self, preprocessor: BasePreprocessor, 
+                 mutator: Optional[PDBMutator]=None, 
                  labels: Optional[Union[str, List[str]]]=None) -> None:
-        super(SDFFileParser, self).__init__(preprocessor)
+        super(SDFFileParser, self).__init__(preprocessor, mutator)
+        if isinstance(labels, str):
+            labels = [labels]
         self.labels = labels
 
     
     def parse(self, filepath: str, return_smiles: bool=False, 
               target_index: Optional[List[int]]=None) -> Dict[str, Any]:
         """Parse SDF file using the preprocessor given.
+
+        TODO: Add ability to mutate sequence at specified positions.
         
         Params:
         -------
@@ -38,13 +49,14 @@ class SDFFileParser(BaseFileParser):
             Path to the dataset to be parsed.
         
         return_smiles: bool, optional, default=False
-            Whether or not to return the SMILES string of the molecule. If 'True', this function 
-            returns the processed dataset and the smiles string. If 'False', then None is returned 
-            for the smiles string.
+            Whether or not to return the SMILES string of the molecule. 
+            If 'True', this function returns the processed dataset and 
+            the smiles string. If 'False', then None is returned for  
+            the smiles string.
 
         target_index: list of int or None, optional, default=None
-            Indicies of molecules to extract. If None, then all examples are parsed. Allows for  
-            easier batching.
+            Indicies to extract. If None, then all examples (in the dataset) 
+            are parsed. Allows for easier batching.
 
         Returns:
         --------
@@ -54,7 +66,7 @@ class SDFFileParser(BaseFileParser):
         smiles_list = []
         pp = self.preprocessor
 
-        if isinstance(pp, BasePreprocessor):
+        if isinstance(pp, MolPreprocessor):
             # Read molecules from filepath
             mols = rdmolfiles.SDMolSupplier(filepath)
             if target_index is None:
@@ -78,13 +90,6 @@ class SDFFileParser(BaseFileParser):
                     # Obtain canonical smiles (since equivalent smiles str are not unique)
                     canonical_smiles, _ = pp.prepare_mol(mol)
                     input_feats = pp.get_input_feats(mol)
-                    
-                    # Initialize features: list of list
-                    if features is None:
-                        num_feats = len(input_feats) if isinstance(input_feats, tuple) else 1
-                        if self.labels is not None:
-                            num_feats += 1
-                        features = [[] for _ in range(num_feats)]
 
                     # Add canonical smiles, if required
                     if return_smiles:
@@ -100,6 +105,12 @@ class SDFFileParser(BaseFileParser):
                     fail_count += 1
                     continue
 
+                # Initialize features: list of list
+                if features is None:
+                    num_feats = len(input_feats) if isinstance(input_feats, tuple) else 1
+                    if self.labels is not None:
+                        num_feats += 1
+                    features = [[] for _ in range(num_feats)]
                 # Append computed features to respective cols
                 if isinstance(input_feats, tuple):
                     for i in range(len(input_feats)):
