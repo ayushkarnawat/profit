@@ -1,4 +1,3 @@
-from profit import cyclops
 from profit import dataset
 from profit import layers
 from profit import models
