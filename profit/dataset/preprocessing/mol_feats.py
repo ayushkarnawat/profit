@@ -1,7 +1,7 @@
 import numpy as np
 
 from typing import Any, List, Optional
-from rdkit.Chem import rdchem, rdmolfiles, rdmolops, rdPartialCharges
+from rdkit.Chem import rdchem, rdmolfiles, rdmolops, rdDistGeom, rdPartialCharges
 
 
 class MolFeatureExtractionError(Exception):
@@ -261,8 +261,13 @@ def construct_pos_matrix(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.ndar
     >>> pos_matrix.shape
     (49,49,3)
     """
-    N = mol.GetNumAtoms()
+    # Obtain initial distance geometry between atoms, if unavilable
+    if mol.GetNumConformers() == 0:
+        mol = rdmolops.AddHs(mol, addCoords=True)
+        rdDistGeom.EmbedMolecule(mol, rdDistGeom.ETKDG())
+        mol = rdmolops.RemoveHs(mol)
     coords = mol.GetConformer().GetPositions() # shape=(N,3)
+    N = mol.GetNumAtoms()
 
     # Determine appropiate output size to generate feature matrix of same size for all mols.
     if out_size < 0:

@@ -11,3 +11,8 @@ from profit.dataset.preprocessors.gcn_preprocessor import GCNPreprocessor
 from profit.dataset.preprocessors.mol_preprocessor import MolPreprocessor
 from profit.dataset.preprocessors.seq_preprocessor import SequencePreprocessor
 from profit.dataset.preprocessors.transformer_preprocessor import TransformerPreprocessor
+
+preprocess_method_dict = {
+    'gcn': GCNPreprocessor,
+    'transformer': TransformerPreprocessor
+}

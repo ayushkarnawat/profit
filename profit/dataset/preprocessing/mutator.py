@@ -5,7 +5,7 @@ import numpy as np
 from rdkit.Chem import rdchem, rdForceFieldHelpers, rdmolfiles
 from rdkit.Geometry.rdGeometry import Point3D
 
-from profit.utils.io import maybe_create_dir
+from profit.utils.io import maybe_create_dir, DownloadError
 
 
 aa1 = "ACDEFGHIKLMNPQRSTVWY"
@@ -46,15 +46,15 @@ def _get_conformer(mol: rdchem.Mol, conformer: str="min", algo: str="MMFF") -> r
         Molecule with conformer of interest.
     """
     ff = {
-        "MMFF": rdForceFieldHelpers.MMFFOptimizeMoleculeConfs(mol, maxIters=0), 
-        "UFF":  rdForceFieldHelpers.UFFOptimizeMoleculeConfs(mol, maxIters=0) 
+        "MMFF": rdForceFieldHelpers.MMFFOptimizeMoleculeConfs, 
+        "UFF":  rdForceFieldHelpers.UFFOptimizeMoleculeConfs 
     }
 
     if conformer == "min":
-        idx = np.argmin(ff[algo], axis=0)[1] # get idx of lowest energy conformation
+        idx = np.argmin(ff[algo](mol, maxIters=0), axis=0)[1] # get idx of lowest energy conformation
         conf = mol.GetConformers()[idx]
     elif conformer == "max":
-        idx = np.argmax(ff[algo], axis=0)[1] # get idx of highest energy conformation
+        idx = np.argmax(ff[algo](mol, maxIters=0), axis=0)[1] # get idx of highest energy conformation
         conf = mol.GetConformers()[idx]
     elif conformer == "first":
         conf = mol.GetConformer(0)
@@ -138,7 +138,9 @@ class PDBMutator(object):
 
         # Load PDB structure (download, if necessary)
         pdb_dir = maybe_create_dir("data/pdb/")
-        _ = cmd.fetch(pdbid, name=pdbid, state=1, type='pdb', path=pdb_dir)
+        is_successful = cmd.fetch(pdbid, name=pdbid, state=1, type='pdb', path=pdb_dir)
+        if is_successful == -1:
+            raise DownloadError("Unable to download '{0:s}'.".format(pdbid))
 
         # Get all residue names, see: https://pymolwiki.org/index.php/List_Selection
         resnames_dict = {'names': []}
@@ -207,8 +209,10 @@ class PDBMutator(object):
             cmd.save(save_path, selection=pdbid, format="pdb")
 
             # Choose model/structure with lowest energy
-            # NOTE: If sanitize=True, the function checks for correct hybridization/valance structure.
-            # This sometimes results in the improper parsing of Mol instance. For now, we ignore this. 
+            # NOTE: If sanitize=True, the function checks if Mol has correct hybridization/valance 
+            # structure (aka is it chemically reasonable). When converting from the PDB block, 
+            # this sometimes results in improper parsing. Instead, for now, we just check if the 
+            # Mol is syntactically valid (i.e. all rings/branches closed, no illegal atom types, etc).
             mol = rdmolfiles.MolFromPDBFile(save_path, sanitize=False, removeHs=False)
             if mol.GetNumConformers() > 1:
                 mol = _get_conformer(mol, conformer="min", algo="MMFF")

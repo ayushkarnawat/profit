@@ -19,22 +19,38 @@ class CSVFileParser(DataFrameParser):
         Preprocessor instance.
     
     mutator: PDBMutator or None, optional, default=None
-        Mutator instance. Used to check if mutation type is compatible 
-        with preprocessor instance.
+        Mutator instance. Checks if mutation type is compatible with  
+        preprocessor instance.
 
     data_col: str, optional, default="Variants"
         Data column.
 
+    pdb_col: str or None, optional, default=None
+        Protein Data Bank (PDB) id column. Contains ID associated with 
+        the data sequence. If data_col contains SMILES strings, then 
+        this value is ignored. If data_col contains sequence, and 
+        mutations are being performed, then the value contained in this 
+        column is used to download/get the full structural information 
+        associated with the sequence. 
+
+    pos_col: str or None, optional, default=None
+        Position column. Contains information about which residues to 
+        modify. If None, along with mutator, no mutations are performed 
+        at the specified positions. Useful for performing mutations 
+        on-the-fly, without need for preprocessing mutations beforehand. 
+
     labels: str or list of str or None, optional, default=None
-        Label column(s).
+        Label column(s). If None, label columns are not extracted.
     """
 
     def __init__(self, preprocessor: BasePreprocessor, 
                  mutator: Optional[PDBMutator]=None, 
                  data_col: str="Variants", 
+                 pdb_col: Optional[str]=None, 
+                 pos_col: Optional[str]=None,
                  labels: Optional[Union[str, List[str]]]=None) -> None:
-        super(CSVFileParser, self).__init__(preprocessor, mutator, 
-                                            data_col=data_col, labels=labels)
+        super(CSVFileParser, self).__init__(preprocessor, mutator, \
+            data_col=data_col, pdb_col=pdb_col, pos_col=pos_col, labels=labels)
 
 
     def parse(self, filepath: str, 
@@ -44,9 +60,7 @@ class CSVFileParser(DataFrameParser):
 
         Label is extracted from `labels` columns and input features are 
         extracted from sequence information in `data_col` column.
-        
-        TODO: Add ability to mutate sequence at specified positions.
-        
+                
         Params:
         -------
         filepath: str
@@ -62,5 +76,5 @@ class CSVFileParser(DataFrameParser):
             'is_successful'. If False, `None` is returned instead.
         """
         df = pd.read_csv(filepath, sep=',')
-        return super(CSVFileParser, self).parse(df, target_index=target_index, 
-                                                return_is_successful=return_is_successful)
+        return super(CSVFileParser, self).parse(df, target_index=target_index, \
+            return_is_successful=return_is_successful)
