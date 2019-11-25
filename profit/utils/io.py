@@ -10,6 +10,10 @@ import numpy as np
 from typing import Tuple
 
 
+class DownloadError(Exception):
+    pass
+
+
 def load_csv(filepath: str, 
              x_name: str, 
              y_name: str) -> Tuple[int, int]:

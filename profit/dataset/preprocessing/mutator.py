@@ -5,7 +5,7 @@ import numpy as np
 from rdkit.Chem import rdchem, rdForceFieldHelpers, rdmolfiles
 from rdkit.Geometry.rdGeometry import Point3D
 
-from profit.utils.io import maybe_create_dir
+from profit.utils.io import maybe_create_dir, DownloadError
 
 
 aa1 = "ACDEFGHIKLMNPQRSTVWY"
@@ -138,7 +138,9 @@ class PDBMutator(object):
 
         # Load PDB structure (download, if necessary)
         pdb_dir = maybe_create_dir("data/pdb/")
-        _ = cmd.fetch(pdbid, name=pdbid, state=1, type='pdb', path=pdb_dir)
+        is_successful = cmd.fetch(pdbid, name=pdbid, state=1, type='pdb', path=pdb_dir)
+        if is_successful == -1:
+            raise DownloadError("Unable to download '{0:s}'.".format(pdbid))
 
         # Get all residue names, see: https://pymolwiki.org/index.php/List_Selection
         resnames_dict = {'names': []}
