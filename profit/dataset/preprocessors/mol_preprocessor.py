@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple, Union
 from rdkit.Chem import rdchem, rdmolfiles, rdmolops
-from profit.dataset.preprocessors.base import BasePreprocessor
+from profit.dataset.preprocessors.base_preprocessor import BasePreprocessor
 
 
 class MolPreprocessor(BasePreprocessor):

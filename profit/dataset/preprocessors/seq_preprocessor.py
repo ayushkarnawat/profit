@@ -1,7 +1,7 @@
 from typing import List, Optional, Union
 
 import numpy as np
-from profit.dataset.preprocessors.base import BasePreprocessor
+from profit.dataset.preprocessors.base_preprocessor import BasePreprocessor
 
 
 class SequencePreprocessor(BasePreprocessor):

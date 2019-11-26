@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
 from profit.dataset.preprocessing.mutator import PDBMutator
-from profit.dataset.preprocessors.base import BasePreprocessor
+from profit.dataset.preprocessors.base_preprocessor import BasePreprocessor
 from profit.dataset.preprocessors.mol_preprocessor import MolPreprocessor
 from profit.dataset.preprocessors.seq_preprocessor import SequencePreprocessor
 

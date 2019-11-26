@@ -8,7 +8,7 @@ from rdkit.Chem import rdmolfiles
 from profit.dataset.parsers.base_parser import BaseFileParser
 from profit.dataset.preprocessing.mol_feats import MolFeatureExtractionError
 from profit.dataset.preprocessing.mutator import PDBMutator
-from profit.dataset.preprocessors.base import BasePreprocessor
+from profit.dataset.preprocessors.base_preprocessor import BasePreprocessor
 from profit.dataset.preprocessors.mol_preprocessor import MolPreprocessor
 
 

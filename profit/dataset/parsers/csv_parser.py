@@ -4,11 +4,11 @@ import pandas as pd
 
 from profit.dataset.parsers.data_frame_parser import DataFrameParser
 from profit.dataset.preprocessing.mutator import PDBMutator
-from profit.dataset.preprocessors.base import BasePreprocessor
+from profit.dataset.preprocessors.base_preprocessor import BasePreprocessor
 
 
 class CSVFileParser(DataFrameParser):
-    """Comma-seperated values (CSV) parser.
+    """Comma-seperated values (CSV) file parser.
     
     The .csv file should contain column which has the sequence as  
     input, and label column which is the target to predict.
