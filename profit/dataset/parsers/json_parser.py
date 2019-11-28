@@ -41,6 +41,10 @@ class JSONFileParser(DataFrameParser):
 
     labels: str or list of str or None, optional, default=None
         Label key(s). If None, label keys are not extracted.
+
+    process_as_seq: bool, optional, default=True
+        If True, process data contained in data_col as a sequence.
+        Otherwise, it is considered a SMILES string. 
     """
 
     def __init__(self, preprocessor: BasePreprocessor, 
@@ -48,9 +52,11 @@ class JSONFileParser(DataFrameParser):
                  data_key: str="Variants", 
                  pdb_key: Optional[str]=None, 
                  pos_key: Optional[str]=None,
-                 labels: Optional[Union[str, List[str]]]=None) -> None:
+                 labels: Optional[Union[str, List[str]]]=None, 
+                 process_as_seq: bool=True) -> None:
         super(JSONFileParser, self).__init__(preprocessor, mutator, \
-            data_col=data_key, pdb_col=pdb_key, pos_col=pos_key, labels=labels)
+            data_col=data_key, pdb_col=pdb_key, pos_col=pos_key, labels=labels, 
+            process_as_seq=process_as_seq)
 
 
     def parse(self, filepath: str, 

@@ -41,6 +41,10 @@ class CSVFileParser(DataFrameParser):
 
     labels: str or list of str or None, optional, default=None
         Label column(s). If None, label columns are not extracted.
+
+    process_as_seq: bool, optional, default=True
+        If True, process data contained in data_col as a sequence.
+        Otherwise, it is considered a SMILES string.
     """
 
     def __init__(self, preprocessor: BasePreprocessor, 
@@ -48,9 +52,11 @@ class CSVFileParser(DataFrameParser):
                  data_col: str="Variants", 
                  pdb_col: Optional[str]=None, 
                  pos_col: Optional[str]=None,
-                 labels: Optional[Union[str, List[str]]]=None) -> None:
+                 labels: Optional[Union[str, List[str]]]=None, 
+                 process_as_seq: bool=True) -> None:
         super(CSVFileParser, self).__init__(preprocessor, mutator, \
-            data_col=data_col, pdb_col=pdb_col, pos_col=pos_col, labels=labels)
+            data_col=data_col, pdb_col=pdb_col, pos_col=pos_col, labels=labels, 
+            process_as_seq=process_as_seq)
 
 
     def parse(self, filepath: str, 

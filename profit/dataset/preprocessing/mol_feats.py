@@ -55,8 +55,8 @@ def check_num_atoms(mol: rdchem.Mol, max_num_atoms: Optional[int]=-1) -> None:
     """
     num_atoms = mol.GetNumAtoms()
     if max_num_atoms >= 0 and num_atoms > max_num_atoms:
-        raise MolFeatureExtractionError('Atoms in mol (N={}) exceeds num_max_atoms (N={}).' \
-            .format(num_atoms, max_num_atoms))
+        raise MolFeatureExtractionError("Atoms in mol (N={}) exceeds " \
+            "num_max_atoms (N={}).".format(num_atoms, max_num_atoms))
 
 
 def construct_mol_features(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.ndarray:

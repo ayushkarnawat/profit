@@ -48,6 +48,10 @@ class DataFrameParser(BaseFileParser):
 
     labels: str or list of str or None, optional, default=None
         Label column(s). If None, label columns are not extracted.
+
+    process_as_seq: bool, optional, default=True
+        If True, process data contained in data_col as a sequence.
+        Otherwise, it is considered a SMILES string.
     """
 
     def __init__(self, preprocessor: BasePreprocessor, 
@@ -55,7 +59,8 @@ class DataFrameParser(BaseFileParser):
                  data_col: str="Variants", 
                  pdb_col: Optional[str]=None, 
                  pos_col: Optional[str]=None, 
-                 labels: Optional[Union[str, List[str]]]=None) -> None:
+                 labels: Optional[Union[str, List[str]]]=None, 
+                 process_as_seq: bool=True) -> None:
         super(DataFrameParser, self).__init__(preprocessor, mutator)
         self.data_col = data_col
         self.pdb_col = pdb_col
@@ -63,6 +68,7 @@ class DataFrameParser(BaseFileParser):
         if isinstance(labels, str):
             labels = [labels]
         self.labels = labels
+        self.process_as_seq = process_as_seq
 
 
     def parse(self, df: pd.DataFrame, 
@@ -84,10 +90,11 @@ class DataFrameParser(BaseFileParser):
             sequence has succeeded or not) is returned in the key 
             'is_successful'. If False, `None` is returned instead.
         """
-        pp = self.preprocessor
-        mutator = self.mutator
         features = None
         is_successful_list = []
+        pp = self.preprocessor
+        mutator = self.mutator
+        processed_as = 'sequence' if self.process_as_seq else 'SMILES'
 
         if target_index is not None:
             df = df.iloc[target_index]
@@ -101,25 +108,36 @@ class DataFrameParser(BaseFileParser):
         success_count = 0 
         total_count = df.shape[0]
         for row in tqdm(df.itertuples(index=False), total=total_count):
-            data = row[data_index]
+            data: Optional[Union[str, List[str]]] = row[data_index]
             pdbid = row[pdb_index] if pdb_index is not None else None
             positions = row[pos_index] if pos_index is not None else None
             labels = [row[i] for i in labels_index]
 
             try:
                 # Check for valid data input
-                if data is None or len(data) == 0:
-                    raise ValueError("Invalid input!")
+                if data is None:
+                    raise TypeError("Invalid type: {}. Should be str or list " \
+                        "of str.".format(type(data).__name__))
+                elif len(data) == 0:
+                    # Raise error for now, if empty list or str is passed in. 
+                    # TODO: Change how each type (molecule or sequence) feature 
+                    # processing handles empty data. If mol.GetNumAtoms() == 0 
+                    # or len(seq) == 0, then a respective FeatureExtractionError 
+                    # should be raised. 
+                    raise ValueError("Cannot process empty data.")
                 
-                # SMILES parsing. Check if valid SMILES (see https://git.io/JePzg)
-                # NOTE: This check fails for edge case '[C]+?' as those are considered valid SMILES
-                # How do we handle if we want that to be processed as a sequence? 
-                mol = rdmolfiles.MolFromSmiles(data, sanitize=True)
-                if mol is not None:
+                # SMILES parsing
+                if not self.process_as_seq:
                     if mutator is not None:
                         warnings.warn("SMILES string '{}' cannot be mutated.".format(data))
 
                     # SMILES string can only be processed as rdkit.Mol instance.
+                    mol = rdmolfiles.MolFromSmiles(data, sanitize=True)
+                    if mol is None:
+                        raise TypeError("Invalid type: {}. Should be " \
+                            "rdkit.Chem.rdchem.Mol.".format(type(mol).__name__))
+
+                    # Compute features if its a proper molecule
                     if isinstance(pp, MolPreprocessor):
                         input_feats = pp.get_input_feats(mol)
                     else:
@@ -139,8 +157,8 @@ class DataFrameParser(BaseFileParser):
                                 "residue positions to mutate residues at defined locations.")
                         else:
                             # Raise error for now, as lengths of positions and seqs need to match 
-                            # to work with the current implementation of mutator. TODO: Change when 
-                            # implementation of mutator changes.
+                            # to work with the current implementation of mutator. 
+                            # TODO: Change when implementation of mutator changes.
                             # NOTE: Should we assume that if the len(positions) < len(data), then 
                             # the user wants to modify those positions in the sequence?
                             if len(data) != len(positions):
@@ -174,8 +192,8 @@ class DataFrameParser(BaseFileParser):
                                 "{}.".format(type(pp).__name__, data, valid_preprocessors))
             except Exception as e:
                 # If for some reason the data cannot be parsed properly, skip
-                print('Error while parsing `{}`, type: {}, {}'.format(data, \
-                    type(e).__name__, e.args))
+                print('Error while parsing `{}` as {}, type: {}, {}'.format(\
+                    data, processed_as, type(e).__name__, e.args))
                 traceback.print_exc()
                 fail_count += 1
                 if return_is_successful:
