@@ -151,8 +151,8 @@ class PDBMutator(object):
         # Cleanup idxs: remove indicies that exceed number of available residues
         nonvalid_idxs = [idx for idx in replace_with.keys() if idx > num_residues]
         for idx in nonvalid_idxs:
-            print("Removing idx {0:d} (out of range). There are only {1:d} "
-                  "residue(s).".format(idx, num_residues))
+            print("Removing idx {0:d} (out of range). There are only {1:d} " \
+                "residue(s).".format(idx, num_residues))
             replace_with.pop(idx)
 
         # Randomly choose an amino acid (AA) to replace a residue, if None is provided.
@@ -167,8 +167,8 @@ class PDBMutator(object):
                 elif len(residue) == 3:
                     replace_with[idx] = residue
             else:
-                raise ValueError("Invalid residue {}. Choose one from the " 
-                                 "following {}.".format(residue, aa3))
+                raise ValueError("Invalid residue '{}'. Choose one from the " \
+                    "following {}.".format(residue, list(aa1) + aa3))
 
         # Replace primary structure, i.e. residue names (str)
         if self.fmt == "primary":
