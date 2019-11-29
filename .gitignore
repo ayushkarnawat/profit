@@ -110,6 +110,4 @@ venv.bak/
 .DS_Store
 
 # project specific
-data/interim/**
-data/processed/**
-data/tmp/**
+data/**
