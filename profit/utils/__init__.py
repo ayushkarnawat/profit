@@ -1,2 +1,3 @@
-from profit.utils import training
-from profit.utils import io
+from profit.utils import data_utils
+from profit.utils import training_utils
+from profit.utils import io_utils

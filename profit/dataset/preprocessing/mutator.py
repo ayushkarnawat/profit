@@ -6,7 +6,7 @@ from rdkit.Chem import rdchem, rdForceFieldHelpers, rdmolfiles
 from rdkit.Geometry.rdGeometry import Point3D
 
 from profit.peptide_builder.polypeptides import aa1, aa3, three_to_one, one_to_three, is_aa
-from profit.utils.io import maybe_create_dir, DownloadError
+from profit.utils.io_utils import maybe_create_dir, DownloadError
 
 
 def _get_conformer(mol: rdchem.Mol, conformer: str="min", algo: str="MMFF") -> rdchem.Mol:

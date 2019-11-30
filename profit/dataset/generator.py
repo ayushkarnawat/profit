@@ -7,7 +7,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from profit.utils.io import maybe_create_dir
+from profit.utils.io_utils import maybe_create_dir
 
 # Setup logging
 logger = logging.getLogger(__name__)
