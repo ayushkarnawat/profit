@@ -1,7 +1,7 @@
 import numpy as np
 
 from typing import Any, List, Optional, Union
-from profit.dataset.preprocessing.vocab import AA_DICT
+from profit.utils.data_utils.vocabs import AA1_DICT, AA3_DICT
 
 
 class SequenceFeatureExtractionError(Exception): 
@@ -85,16 +85,19 @@ def construct_embedding(seq: Union[str, List[str]],
     # Convert residue names to int (based off vocab dict)
     if isinstance(seq, str):
         seq = list(seq)
-    embedding = np.array([AA_DICT.get(aa) for aa in seq], dtype=np.float)
+    embedding = [AA1_DICT.get(aa, AA1_DICT["U"]) 
+                 if len(aa)==1 else AA3_DICT.get(aa, AA3_DICT["UNK"]) 
+                 for aa in seq]
+    embedding = np.array(embedding, dtype=np.float)
 
     # TODO: Embed into protein space (using preprocessing/embedding.py)
     # Embedding shape=(num_residues, embedding_dims)
     if use_pretrained:
         raise NotImplementedError
     
-    # Pad (w/ unknown value) to defined size
+    # Pad (w/ zero) to defined size
     full_size = [size] + list(embedding[:].shape[1:])
     pad_width = [(0, full_size[i] - embedding[:].shape[i]) for i in range(embedding.ndim)]
-    padded_embed = np.pad(embedding, pad_width, mode="constant", constant_values=AA_DICT.get("X"))
+    padded_embed = np.pad(embedding, pad_width, mode="constant", constant_values=AA1_DICT.get("X"))
     return padded_embed
     

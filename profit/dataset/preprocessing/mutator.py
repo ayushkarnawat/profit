@@ -5,22 +5,8 @@ import numpy as np
 from rdkit.Chem import rdchem, rdForceFieldHelpers, rdmolfiles
 from rdkit.Geometry.rdGeometry import Point3D
 
-from profit.utils.io import maybe_create_dir, DownloadError
-
-
-aa1 = "ACDEFGHIKLMNPQRSTVWY"
-aa3 = ["ALA", "CYS", "ASP", "GLU", "PHE", "GLY", "HIS", "ILE", "LYS",
-       "LEU", "MET", "ASN", "PRO", "GLN", "ARG", "SER", "THR", "VAL",
-       "TRP", "TYR"]
-
-three_to_one = {aa_name: aa1[idx] for idx, aa_name in enumerate(aa3)}
-one_to_three = {value: key for key, value in three_to_one.items()}
-
-
-def is_aa(residue: str) -> bool:
-    """Determine if valid amino acid."""
-    residue = residue.upper()
-    return residue in list(aa1) or residue in aa3
+from profit.peptide_builder.polypeptides import aa1, aa3, three_to_one, one_to_three, is_aa
+from profit.utils.io_utils import maybe_create_dir, DownloadError
 
 
 def _get_conformer(mol: rdchem.Mol, conformer: str="min", algo: str="MMFF") -> rdchem.Mol:
@@ -168,7 +154,7 @@ class PDBMutator(object):
                     replace_with[idx] = residue
             else:
                 raise ValueError("Invalid residue '{}'. Choose one from the " \
-                    "following {}.".format(residue, list(aa1) + aa3))
+                    "following {}.".format(residue, aa1 + aa3))
 
         # Replace primary structure, i.e. residue names (str)
         if self.fmt == "primary":
