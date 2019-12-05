@@ -5,6 +5,11 @@ import numpy as np
 from rdkit.Chem import rdchem, rdForceFieldHelpers, rdmolfiles
 from rdkit.Geometry.rdGeometry import Point3D
 
+import pymol
+import __main__
+from pymol import cmd
+from pymol.wizard.mutagenesis import Mutagenesis
+
 from profit.peptide_builder.polypeptides import aa1, aa3, three_to_one, one_to_three, is_aa
 from profit.utils.io_utils import maybe_create_dir, DownloadError
 
@@ -89,6 +94,10 @@ class PDBMutator(object):
         self.fmt = fmt
         self.remove_tmp_file = remove_tmp_file
 
+        # Launch PyMol quietly (no msg) with no GUI
+        __main__.pymol_argv = ['pymol', '-qc']
+        pymol.finish_launching()
+
     
     def modify_residues(self, pdbid: str, replace_with: Dict[int, Optional[str]]) \
                         -> Union[List[str], rdchem.Mol]:
@@ -114,14 +123,6 @@ class PDBMutator(object):
             Modified peptide with residues. If fmt='primary', then list of string (peptide names) 
             is returned. If fmt='tertiary', then 3D molecule structure is returned.
         """
-        # Launch PyMol quietly (no msg) with no GUI
-        import __main__
-        import pymol
-        from pymol import cmd
-        from pymol.wizard.mutagenesis import Mutagenesis
-        __main__.pymol_argv = ['pymol', '-qc']
-        pymol.finish_launching()
-
         # Load PDB structure (download, if necessary)
         pdb_dir = maybe_create_dir("data/pdb/")
         is_successful = cmd.fetch(pdbid, name=pdbid, state=1, type='pdb', path=pdb_dir)
@@ -193,6 +194,7 @@ class PDBMutator(object):
             save_path = "data/tmp/{0:s}_mutated_{1:s}.pdb".format(pdbid, mutated_res_ids)
             _ = maybe_create_dir(save_path)
             cmd.save(save_path, selection=pdbid, format="pdb")
+            cmd.delete('all') # remove all objects, clears workspace
 
             # Choose model/structure with lowest energy
             # NOTE: If sanitize=True, the function checks if Mol has correct hybridization/valance 
