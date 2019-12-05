@@ -71,7 +71,7 @@ def maybe_create_dir(path: str) -> str:
     """
     save_path = os.path.expanduser(path)
     save_dir, _ = os.path.split(save_path)
-    if not os.path.exists(save_dir):
+    if not os.path.isdir(save_dir):
         print('Creating directory `{0:s}`'.format(save_dir))
         os.makedirs(save_dir)
     return save_path

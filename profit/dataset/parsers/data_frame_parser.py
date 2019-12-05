@@ -163,7 +163,7 @@ class DataFrameParser(BaseFileParser):
                             # the user wants to modify those positions in the sequence?
                             if len(data) != len(positions):
                                 raise ValueError("Length of input (N={}) is not the same as number " \
-                                    "of positions (N={}) to modify. Did you pass in the full" \
+                                    "of positions (N={}) to modify. Did you pass in the full " \
                                     "sequence? Currently, mutations can only be performed with " \
                                     "information about which residue position(s) to modify and the " \
                                     "replacement residue(s) at those positions. If you want to " \
