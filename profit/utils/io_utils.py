@@ -62,15 +62,16 @@ def maybe_create_dir(path: str) -> str:
     Params:
     -------
     path: str
-        Full path to save data.
+        Full path location to save data.
 
     Returns:
     --------
-    path: str
+    save_path: str
         Full path to where directory was created.
     """
+    # If there is filename extension, remove filename with extension
     save_path = os.path.expanduser(path)
-    save_dir, _ = os.path.split(save_path)
+    save_dir = os.path.split(save_path)[0] if os.path.splitext(save_path)[1] else save_path
     if not os.path.isdir(save_dir):
         print('Creating directory `{0:s}`'.format(save_dir))
         os.makedirs(save_dir)

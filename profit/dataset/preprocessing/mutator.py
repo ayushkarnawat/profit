@@ -139,7 +139,7 @@ class PDBMutator(object):
             then 3D molecule structure is returned.
         """
         # Load PDB structure (download, if necessary)
-        pdb_dir = maybe_create_dir("data/pdb/")
+        pdb_dir = maybe_create_dir(os.path.join(self.rootdir, pdbid))
         is_successful = cmd.fetch(pdbid, name=pdbid, state=1, type="pdb", path=pdb_dir)
         if is_successful == -1:
             raise DownloadError("Unable to download '{0:s}'.".format(pdbid))
