@@ -9,7 +9,7 @@ from profit.layers.convs import GraphConvS, GraphConvV
 from profit.layers.embed import GraphEmbed
 from profit.layers.gather import GraphGather
 from profit.layers.nodes import GraphSToS, GraphSToV, GraphVToS, GraphVToV
-from profit.utils.training_utils.loss import std_mae, std_rmse, std_r2
+from profit.utils.training_utils.metrics import std_mae, std_rmse, std_r2
 
 
 class GCN(object):
