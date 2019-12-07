@@ -1,5 +1,6 @@
 import os
 from typing import Optional
+from profit.utils.io_utils import maybe_create_dir
 
 
 class CacheNamePolicy(object):
@@ -33,18 +34,18 @@ class CacheNamePolicy(object):
     def __init__(self, method: str, mutator: Optional[str]=None, 
                  labels: Optional[str]=None, rootdir: str='input', 
                  num_data: int=-1) -> None:
-        self.filename = '{}.npz'.format(mutator) if mutator else 'original.npz'
+        num_data_str = "{0:d}".format(num_data) if num_data >= 0 else ""
+        mutator_str = "{0:s}".format(mutator.lower()) if mutator else "original"
+        self.filename = "{}{}.h5".format(mutator_str, num_data_str)
         self.method = method
         self.labels = labels
         self.rootdir = rootdir
-        self.num_data = num_data
         self.cache_dir = self._get_cache_directory_path(rootdir, method, \
-            labels, num_data)
+            labels)
 
 
     def _get_cache_directory_path(self, rootdir: str, method: str, 
-                                  labels: Optional[str]=None, 
-                                  num_data: int=-1) -> str:
+                                  labels: Optional[str]=None) -> str:
         """Get cache directory where data is stored.
         
         Params:
@@ -59,18 +60,13 @@ class CacheNamePolicy(object):
             Label processed. If None or '', then all labels (for multi-task 
             learning) were used. 
 
-        num_data: int, default=-1
-            The number of datapoints saved in the dataset. If -1, then all 
-            datapoints were processed.
-
         Returns:
         --------
         dir_path: str
             Cache directory path.
         """
-        labels_str = '_{}'.format(labels) if labels else '_all'
-        num_data_str = '{}'.format(num_data) if num_data >= 0 else ''
-        return os.path.join(rootdir, '{}{}{}'.format(method, labels_str, num_data_str))
+        labels_str = '_{}'.format(labels.lower()) if labels else '_all'
+        return os.path.join(rootdir, '{}{}'.format(method.lower(), labels_str))
 
 
     def get_data_file_path(self) -> str:
@@ -86,8 +82,4 @@ class CacheNamePolicy(object):
 
     def create_cache_directory(self) -> None:
         """Creates cache directory."""
-        try:
-            os.makedirs(self.cache_dir)
-        except OSError:
-            if not os.path.isdir(self.cache_dir):
-                raise
+        return maybe_create_dir(self.cache_dir)

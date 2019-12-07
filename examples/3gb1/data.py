@@ -1,5 +1,6 @@
 import os
 
+import h5py
 import numpy as np
 import pandas as pd
 
@@ -9,29 +10,29 @@ from profit.dataset.preprocessors import preprocess_method_dict
 from profit.utils.data_utils.cacher import CacheNamePolicy
 
 
-def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/', num_data=-1, out_size=50) -> np.ndarray:
+def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/', 
+                 num_data=-1) -> np.ndarray:
     """
-    TODO: Change to variable filepath. Should we allow for hardcoded parser? 
-    Depends on variable filepath extension. As of now, we have hardcoded this 
-    info because the filepath is known. 
-    TODO: Allow user to specify columns names for the PDB id and positions. 
-    As of now, they are hardcoded to 'PDBID' and 'Positions'
-    TODO: Specify max_size for proper feature concatenation. useful in this 
-    scenario, because we cannot specify the larget size we want to use.    
+    TODO: Change to variable filepath. Should we allow for hardcoded 
+    parser? Depends on variable filepath extension. As of now, we have 
+    hardcoded this info because the filepath is known. 
+    TODO: Allow user to specify columns names for the PDB id and 
+    positions. As of now, they are hardcoded to 'PDBID' and 'Positions'.   
     """
-    policy = CacheNamePolicy(method, mutator_fmt, labels, rootdir=rootdir, num_data=num_data)
+    policy = CacheNamePolicy(method, mutator_fmt, labels, rootdir=rootdir, 
+                             num_data=num_data)
     data_path = policy.get_data_file_path()
 
     # Load data from cache, if it exists
     data = None
     if os.path.exists(data_path):
         print('Loading preprocessed data from cache `{}`'.format(data_path))
-        npzdata = np.load(data_path)
-        data = list(dict(npzdata).values())
+        with h5py.File(data_path, "r") as h5file:
+            data = [h5file.get(key)[:] for key in list(h5file.keys())]
     if data is None:
         # Initalize class(es)
-        preprocessor = preprocess_method_dict.get(method)(out_size=out_size)
-        mutator = PDBMutator(fmt=mutator_fmt, remove_tmp_file=False)
+        preprocessor = preprocess_method_dict.get(method)()
+        mutator = PDBMutator(fmt=mutator_fmt, cache=True) if mutator_fmt else None
         print('Preprocessing dataset using {}...'.format(type(preprocessor).__name__))
 
         # Preprocess dataset w/ mutations if requested
@@ -48,11 +49,8 @@ def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/', nu
 
         # Cache dataset using default array names
         policy.create_cache_directory()
-        np.savez(data_path, *data)
+        with h5py.File(data_path, "w") as h5file:
+            for idx, arr in enumerate(data):
+                name = "chunked_arr{}".format(idx)
+                h5file.create_dataset(name, data=arr, chunks=True, compression="gzip")
     return data
-
-
-if __name__ == "__main__":
-    data = load_dataset('gcn', 'tertiary', labels='Fitness', num_data=10, out_size=1000)
-    for arr in data:
-        print(arr.shape)

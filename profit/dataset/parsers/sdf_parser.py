@@ -12,6 +12,8 @@ from profit.dataset.preprocessing.mutator import PDBMutator
 from profit.dataset.preprocessors.base_preprocessor import BasePreprocessor
 from profit.dataset.preprocessors.mol_preprocessor import MolPreprocessor
 
+from profit.utils.data_utils.cast import broadcast_array
+
 
 class SDFFileParser(BaseFileParser):
     """Structure data file (SDF) file parser.
@@ -139,7 +141,7 @@ class SDFFileParser(BaseFileParser):
         
         # Compile each feature(s) into individual np.ndarray s.t. the first 
         # channel becomes the num of examples in the dataset.
-        all_feats = [np.array(feature) for feature in features] if features is not None else []
+        all_feats = [broadcast_array(feature) for feature in features] if features else []
         all_smiles = np.array(smiles_list) if return_smiles else None
         is_successful = np.array(is_successful_list) if return_is_successful else None
         return {"dataset": all_feats, "smiles": all_smiles, "is_successful": is_successful}
