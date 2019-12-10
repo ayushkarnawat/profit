@@ -32,7 +32,7 @@ def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/',
     if data is None:
         # Initalize class(es)
         preprocessor = preprocess_method_dict.get(method)()
-        mutator = PDBMutator(fmt=mutator_fmt, cache=True) if mutator_fmt else None
+        mutator = PDBMutator(fmt=mutator_fmt) if mutator_fmt else None
         print('Preprocessing dataset using {}...'.format(type(preprocessor).__name__))
 
         # Preprocess dataset w/ mutations if requested

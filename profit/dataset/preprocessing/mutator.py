@@ -98,7 +98,7 @@ class PDBMutator(object):
 
     cache: bool, default=False
         If "True", the mutated files are saved after they are computed 
-        and returned. If "False", they are deleted. 
+        and returned. If "False" (recommended), they are deleted. 
     """
     
     def __init__(self, fmt: str="tertiary", rootdir="data/tmp", cache: bool=False) -> None:

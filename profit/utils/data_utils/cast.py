@@ -23,7 +23,7 @@ def broadcast_array(arr: List[Union[List[int], List[float], np.ndarray]], values
 
     # Pad (w/ zeros) to computed size (aka max size across each dimension)
     # NOTE: Formatting of pad_widths is necessary so that the padded values are 
-    # added to the end of each dimension. The format is, as follows:
+    # added to the end of each axis/dimension. The format is, as follows:
     # 
     # [[(0, pad_widths[0][0]), (0, pad_widths[0][1]), ..., (0, pad_widths[0][m])]
     #  [(0, pad_widths[1][0]), (0, pad_widths[1][1]), ..., (0, pad_widths[1][m])]

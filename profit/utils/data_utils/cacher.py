@@ -7,7 +7,6 @@ class CacheNamePolicy(object):
     """Cached dataset naming policy.
     
     Contains filepaths associated with the processed data.
-    TODO: Change whole filenames to lowercase?
 
     Params:
     -------
