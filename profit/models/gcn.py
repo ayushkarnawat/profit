@@ -14,9 +14,6 @@ from profit.utils.training_utils.metrics import std_mae, std_rmse, std_r2
 
 class GCN(object):
     """Graph Convolution Network.
-    
-    task type can be automatically determined from the type of data. If it is a float or int...classification or regression.
-    Should this be handled by this, or by the trainer class?????? Well, if its handled in this, it has to be determined by every single model, which means it needs to be impemented over and over, which is wrong. Rather, we can just determine it in the trainer class, which will make it easier to implement other models.
 
     Params:
     -------
@@ -39,19 +36,22 @@ class GCN(object):
         Total number of graph convolution layer(s).
 
     task: str, optional, default='regression'
-        Whether the task is classification (binary or multi-label) or regression-based. 
+        Whether the task is classification (binary or multi-label) or 
+        regression-based. 
 
     loss: str, optional, default="mse"
         Loss function. See keras.losses for list of all available losses.
 
     pooling: str, optional, default="max"
-        Type of down-sample pooling technique to perform on the hidden representations after the 
-        graph convolutions. The representations are either summed, averaged, or maxed depending 
-        on the pooling type chosen.
+        Type of down-sample pooling technique to perform on the hidden 
+        representations after the graph convolutions. The representations 
+        are either summed, averaged, or maxed depending on the pooling 
+        type chosen.
 
     std: float or None, optional, default=None
-        Standard deviation of the dataset. If regression-based task, then a std must be provided, 
-        which is usually the standard deviation of the training dataset.
+        Standard deviation of the dataset. If regression-based task, 
+        then a std must be provided, which is usually the standard 
+        deviation of the training dataset.
     """
 
     def __init__(self, num_atoms: int, num_feats: int, num_outputs: int,
@@ -73,8 +73,8 @@ class GCN(object):
             if std is not None:
                 self.std = std
             else:
-                raise ValueError("Standard deviation of the dataset must be provided for "
-                                 "regression tasks.")
+                raise ValueError("Standard deviation of the dataset must be "
+                                 "provided for regression tasks.")
         
 
     def get_model(self) -> Model:
