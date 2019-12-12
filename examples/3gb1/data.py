@@ -11,7 +11,7 @@ from profit.utils.data_utils.cacher import CacheNamePolicy
 
 
 def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/', 
-                 num_data=-1) -> np.ndarray:
+                 num_data=-1, filetype='h5') -> np.ndarray:
     """
     TODO: Change to variable filepath. Should we allow for hardcoded 
     parser? Depends on variable filepath extension. As of now, we have 
@@ -20,7 +20,7 @@ def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/',
     positions. As of now, they are hardcoded to 'PDBID' and 'Positions'.   
     """
     policy = CacheNamePolicy(method, mutator_fmt, labels, rootdir=rootdir, 
-                             num_data=num_data)
+                             num_data=num_data, filetype=filetype)
     data_path = policy.get_data_file_path()
 
     # Load data from cache, if it exists
@@ -51,6 +51,6 @@ def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/',
         policy.create_cache_directory()
         with h5py.File(data_path, "w") as h5file:
             for idx, arr in enumerate(data):
-                name = "chunked_arr{}".format(idx)
+                name = "arr{}".format(idx)
                 h5file.create_dataset(name, data=arr, chunks=True, compression="gzip")
     return data
