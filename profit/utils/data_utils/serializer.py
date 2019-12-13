@@ -1,11 +1,9 @@
 import os
-
-import h5py
 import numpy as np
 import tensorflow as tf
 
 from tqdm import tqdm
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Union
 
 
 def _bytes_feature(value: Union[str, bytes]):
@@ -44,19 +42,28 @@ def serialize(example: Dict[str, Dict[str, Any]]):
     return example_proto.SerializeToString()
 
 
-def deserialize(example: Any):
-    raise NotImplementedError
+def dataset_to_tfrecords(data: List[np.ndarray], save_filepath: str):
+    """Save a list of np.ndarray (aka dataset) into a .tfrecords file.
 
+    NOTE: TFRecords flatten each ndarray before saving them as bytes 
+    feature. To combat this, maybe we should save the shape dims as 
+    well, and reshape them back after reading from the tfrecords.
+    
+    Params:
+    -------
+    data: list of np.ndarray
+        Ndarray's to save. The first channel of each ndarray should  
+        contain the number of examples in the dataset. 
 
-def save_to_tfrecords(dataset_fp):
-    """Save a .h5 file to .tfrecords."""
-    filename, _ = os.path.splitext(dataset_fp)
-    with h5py.File(dataset_fp, "r") as h5file:
-        n_examples = h5file[list(h5file.keys())[0]].shape[0]
-        with tf.io.TFRecordWriter("{}.tfrecord".format(filename)) as writer:
-            for row in tqdm(range(n_examples)):
-                example = {arr_name: {"data": np.string_(h5file[arr_name][row]).tobytes(), 
-                                      "_type": _bytes_feature} 
-                           for arr_name in list(h5file.keys())}
-                # Serialize + write the defined example into the dataset
-                writer.write(serialize(example))
+    save_filepath: str
+        Save filename path. Should end in '.tfrecords'.
+    """
+    assert save_filepath.endswith(".tfrecords")
+    n_examples = data[0].shape[0]
+    with tf.io.TFRecordWriter(save_filepath) as writer:
+        for row in tqdm(range(n_examples), total=n_examples):
+            example = {"arr_{}".format(idx): {"data": np.string_(nparr[row]).tobytes(), 
+                                              "_type": _bytes_feature} 
+                       for idx, nparr in enumerate(data)}
+            # Write serialized example into the dataset
+            writer.write(serialize(example))
