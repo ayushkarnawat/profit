@@ -8,8 +8,8 @@ import pandas as pd
 from profit.dataset.parsers.data_frame_parser import DataFrameParser
 from profit.dataset.preprocessing.mutator import PDBMutator
 from profit.dataset.preprocessors import preprocess_method_dict
+from profit.utils.data_utils import serialize_method_dict
 from profit.utils.data_utils.cacher import CacheNamePolicy
-from profit.utils.data_utils.serializer import dataset_to_tfrecords
 
 
 def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/', 
@@ -43,8 +43,10 @@ def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/',
     policy = CacheNamePolicy(method, mutator_fmt, labels, rootdir=rootdir, 
                              num_data=num_data, filetype=filetype)
     data_path = policy.get_data_file_path()
+    serializer = serialize_method_dict.get(filetype)()
 
     # Compute features
+    data = None
     if not os.path.exists(data_path):
         # Initalize class(es)
         preprocessor = preprocess_method_dict.get(method)()
@@ -65,43 +67,14 @@ def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/',
 
         # Cache results using default array names
         policy.create_cache_directory()
-        if filetype == "npy":
-            if len(data) > 1:
-                warnings.warn("Unable to save {} ndarray's into .npy file. " \
-                    "Use another filetype to cache results.".format(len(data)))
-            else:
-                np.save(data_path, data)
-        elif filetype == "npz":
-            np.savez_compressed(data_path, *data)
-        elif filetype == "h5" or filetype == ".hdf5":
-            h5file = h5py.File(data_path, "w")
-            for idx, arr in enumerate(data):
-                name = "arr_{}".format(idx)
-                h5file.create_dataset(name, data=arr, chunks=True, compression="gzip")
-            h5file.close()
-        elif filetype == "tfrecords":
-            dataset_to_tfrecords(data, data_path)
-        elif filetype == "lmdb":
-            raise NotImplementedError
-        else:
-            raise NotImplementedError("{} filetype not currently supported.".\
-                format(filetype))
-
-    # If filetype is a serialized database (e.g. tfrecords or lmdb)
-    if filetype == "tfrecords" or filetype == "lmdb":
-        warnings.warn("Not loading dataset into memory. Returning path " \
-            "to saved database instead.")
-        data = data_path
+        serializer.save(data=data, path=data_path)
     
     # Load data from cache, if it exists
     if data is None:
         print('Loading preprocessed data from cache `{}`'.format(data_path))
-        if filetype == "npy":
-            data = np.load(data_path, allow_pickle=False)
-        elif filetype == "npz":
-            with np.load(data_path, allow_pickle=False) as npzfile:
-                data = [arr[:] for arr in list(npzfile.values())]
-        elif filetype == "h5" or filetype == "hdf5":
-            with h5py.File(data_path, "r") as h5file:
-                data = [h5file.get(key)[:] for key in list(h5file.keys())]
+        data = serializer.load(path=data_path)
     return data
+
+if __name__ == "__main__":
+    data = load_dataset('gcn', 'tertiary', labels='Fitness', num_data=1, filetype='tfrecords')
+    print(data)
