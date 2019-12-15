@@ -31,13 +31,13 @@ class CacheNamePolicy(object):
 
     filetype: str, default="h5"
         What extension to save the data with. The supported types are 
-        'npy', 'npz', 'hdf5', 'h5', 'tfrecords', 'lmdb'.
+        'npz', 'h5', 'hdf5', 'tfrecords', 'lmdb'.
     """
 
     def __init__(self, method: str, mutator: Optional[str]=None, 
                  labels: Optional[str]=None, rootdir: str='base', 
                  num_data: int=-1, filetype: str="h5") -> None:
-        assert filetype in ['npy', 'npz', 'h5', 'hdf5', 'tfrecords', 'lmdb']
+        assert filetype in ['npz', 'h5', 'hdf5', 'tfrecords', 'lmdb']
         num_data_str = "{0:d}".format(num_data) if num_data >= 0 else ""
         mutator_str = "{0:s}".format(mutator.lower()) if mutator else "original"
         self.filename = "{}{}.{}".format(mutator_str, num_data_str, filetype)
