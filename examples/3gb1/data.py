@@ -1,7 +1,4 @@
 import os
-import warnings
-
-import h5py
 import numpy as np
 import pandas as pd
 
@@ -76,5 +73,5 @@ def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/',
     return data
 
 if __name__ == "__main__":
-    data = load_dataset('gcn', 'tertiary', labels='Fitness', num_data=1, filetype='tfrecords')
+    data = load_dataset('gcn', 'tertiary', labels='Fitness', num_data=10, filetype='tfrecords')
     print(data)
