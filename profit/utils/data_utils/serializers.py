@@ -1,3 +1,4 @@
+from abc import abstractmethod, ABC
 from functools import partial
 from typing import Any, Dict, List, Tuple, Union
 
@@ -8,7 +9,55 @@ import tensorflow as tf
 from tqdm import tqdm
 
 
-class HDF5Serializer(object):
+class BaseSerializer(ABC):
+    """Base serializer."""
+
+    @staticmethod
+    @abstractmethod
+    def save(data: Any, path: str) -> None:
+        """Save the data to file."""
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def load(path: str) -> Any:
+        """Load the dataset into its original shape/format."""
+        raise NotImplementedError
+
+
+class InMemorySerializer(BaseSerializer, ABC):
+    """Serialize and load the dataset in memory."""
+
+    @staticmethod
+    @abstractmethod
+    def save(data: Any, path: str) -> None:
+        """Save the data to file."""
+        raise NotImplementedError
+    
+    @staticmethod
+    @abstractmethod
+    def load(path: str) -> Any:
+        """Load the dataset (in memory) into its original shape/format."""
+        raise NotImplementedError
+
+
+class LazySerializer(BaseSerializer, ABC):
+    """Serialize and load the dataset lazily."""
+
+    @staticmethod
+    @abstractmethod
+    def save(data: Any, path: str) -> None:
+        """Save the data to file."""
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def load(path: str) -> Any:
+        """Lazily load the dataset into its original shape/format."""
+        raise NotImplementedError
+
+
+class HDF5Serializer(InMemorySerializer):
     """Serialize ndarray's to HDF5 file.
     
     Note that HDF5 files are not that performant and do not (currently) 
@@ -58,14 +107,14 @@ class HDF5Serializer(object):
         Returns:
         --------
         data: np.ndarray or list of np.ndarray
-            The dataset (in its original form).
+            The dataset (in its original shape/format).
         """
         with h5py.File(path, "r") as h5file:
             data = [h5file.get(key)[:] for key in list(h5file.keys())]
         return data[0] if len(data) == 1 else data
 
 
-class LMDBSerializer(object):
+class LMDBSerializer(LazySerializer):
     """Serialize ndarray's to a LMDB database. 
     
     The keys are _____, and the values are the serialized ndarrays.
@@ -108,12 +157,13 @@ class LMDBSerializer(object):
         Returns:
         --------
         data: np.ndarray or list of np.ndarray or LMDBDatabase
-            The dataset (either in its original form or as a LMDBDataset).
+            The dataset (either in its original shape/format or as a 
+            LMDBDataset).
         """
         raise NotImplementedError
 
 
-class NumpySerializer(object):
+class NumpySerializer(InMemorySerializer):
     """Serialize ndarray's to a npz dict.
     
     Note that npz files do not support lazy loading and are >10x slower 
@@ -158,14 +208,14 @@ class NumpySerializer(object):
         Returns:
         --------
         data: np.ndarray or list of np.ndarray
-            The dataset (in its original form).
+            The dataset (in its original shape/format).
         """
         with np.load(path, allow_pickle=False) as npzfile:
             data = [arr[:] for arr in list(npzfile.values())]
         return data[0] if len(data) == 1 else data
 
 
-class TFRecordsSerializer(object):
+class TFRecordsSerializer(LazySerializer):
     """Serialize np.ndarray's to bytes and write to TFRecords file.
     
     Note that TFRecords does not support random access and is in fact 
@@ -268,7 +318,8 @@ class TFRecordsSerializer(object):
         Returns:
         --------
         data: np.ndarray or list of np.ndarray or tf.data.TFRecordDataset
-            The dataset (either in its original form or as a TFRecordDataset).
+            The dataset (either in its original shape/format or as a 
+            TFRecordDataset).
         """
         def _deserialize(serialized: tf.Tensor, features: Dict[str, tf.io.FixedLenFeature], 
                          **kwargs: Dict[str, List[int]]) -> Tuple[tf.Tensor, ...]:
