@@ -43,13 +43,17 @@ class HDF5Serializer(object):
         
 
     @staticmethod
-    def load(path: str) -> Union[np.ndarray, List[np.ndarray]]:
+    def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, List[np.ndarray]]:
         """Load the dataset.
         
         Params:
         -------
         path: str
             HDF5 file which contains dataset.
+
+        as_numpy: bool, default=False
+            Ignored; always loads into np.ndarray's. Exists for 
+            compatability with other serializers.
 
         Returns:
         --------
@@ -79,7 +83,7 @@ class LMDBSerializer(object):
             ndarray should contain the num of examples in the dataset.
 
         path: str
-            Output lmbd file.
+            Output LMDB file.
 
         write_frequence: int, default=5000
             The frequency to write back data to disk. Smaller value(s) 
@@ -89,7 +93,7 @@ class LMDBSerializer(object):
 
 
     @staticmethod
-    def load(path: str) -> Union[np.ndarray, List[np.ndarray]]:
+    def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, List[np.ndarray]]:
         """Load the dataset.
         
         Params:
@@ -97,10 +101,14 @@ class LMDBSerializer(object):
         path: str
             LMDB file which contains dataset.
 
+        as_numpy: bool, default=False
+            If True, loads the dataset as a list of np.ndarray's (in 
+            its original form). If False, loads it as a LMDBDatabase.
+
         Returns:
         --------
-        data: LMDB TODO: Change type
-            The dataset (in its original form).
+        data: np.ndarray or list of np.ndarray or LMDBDatabase
+            The dataset (either in its original form or as a LMDBDataset).
         """
         raise NotImplementedError
 
@@ -135,13 +143,17 @@ class NumpySerializer(object):
         
 
     @staticmethod
-    def load(path: str) -> Union[np.ndarray, List[np.ndarray]]:
+    def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, List[np.ndarray]]:
         """Load the dataset.
         
         Params:
         -------
         path: str
             Npz file which contains dataset.
+
+        as_numpy: bool, default=False
+            Ignored; always loads into np.ndarray's. Exists for 
+            compatability with other serializers.
 
         Returns:
         --------
@@ -179,7 +191,7 @@ class TFRecordsSerializer(object):
             ndarray should contain the num of examples in the dataset.
 
         path: str
-            Output tfrecords file.
+            Output TFRecords file.
         """
         def _bytes_feature(value: Union[str, bytes]):
             """Returns a bytes_list from a string / byte."""
@@ -236,7 +248,7 @@ class TFRecordsSerializer(object):
 
     
     @staticmethod
-    def load(path: str, as_tfrecords: bool=True) -> Union[np.ndarray, \
+    def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, \
         List[np.ndarray], tf.data.TFRecordDataset]:
         """Load the dataset.
 
@@ -249,9 +261,9 @@ class TFRecordsSerializer(object):
         path: str
             TFRecords file which contains the dataset.
 
-        as_tfrecords: bool, default=True
-            If True, loads the dataset as a TFRecordDataset. If False, 
-            loads it as a list of np.ndarray's (in its original form).
+        as_numpy: bool, default=False
+            If True, loads the dataset as a list of np.ndarray's (in 
+            its original form). If False, loads it as a TFRecordDataset.
 
         Returns:
         --------
@@ -295,7 +307,7 @@ class TFRecordsSerializer(object):
         features = {}
         for name in example.features.feature.keys():
             if name.startswith("arr"):
-                # NOTE: Assuming all arr_i's are saved as bytes
+                # NOTE: Assuming all arr_i's are saved as bytes_list
                 features[name] = tf.io.FixedLenFeature([], tf.string)
             elif name.startswith("shape"):
                 # NOTE: Assuming arr shape_i's are saved as int64_lists 
@@ -304,7 +316,7 @@ class TFRecordsSerializer(object):
                 raise TypeError("Unknown dtype for {} .".format(name))
 
         # Parse serialized records into correctly shaped tensors/ndarray's
-        if as_tfrecords:
+        if not as_numpy:
             dataset = tf.data.TFRecordDataset(path)
             data = dataset.map(partial(_deserialize, features=features, **shapes))
         else:
