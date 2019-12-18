@@ -20,6 +20,7 @@ serialize_method_dict = {
     "h5": HDF5Serializer,
     "hdf5": HDF5Serializer,
     "lmdb": LMDBSerializer,
+    "mdb": LMDBSerializer,
     "npz": NumpySerializer,
     "tfrecords": TFRecordsSerializer
 }

@@ -1,9 +1,14 @@
+import os
+import platform
+
 from abc import abstractmethod, ABC
 from functools import partial
 from typing import Any, Dict, List, Tuple, Union
 
 import h5py
+import lmdb
 import numpy as np
+import pickle as pkl
 import tensorflow as tf
 
 from tqdm import tqdm
@@ -115,15 +120,15 @@ class HDF5Serializer(InMemorySerializer):
 
 
 class LMDBSerializer(LazySerializer):
-    """Serialize ndarray's to a LMDB database. 
+    """Serialize ndarray's to a LMDB database.
     
-    The keys are _____, and the values are the serialized ndarrays.
+    The keys are idx, and the values are the list of serialized ndarrays.
     """
 
     @staticmethod
     def save(data: Union[np.ndarray, List[np.ndarray]], path: str, 
-             write_frequency: int=5000) -> None:
-        """Save data to .lmdb file.
+             write_frequency: int=1) -> None:
+        """Save data to .lmdb/.mdb file.
         
         Params:
         -------
@@ -132,17 +137,76 @@ class LMDBSerializer(LazySerializer):
             ndarray should contain the num of examples in the dataset.
 
         path: str
-            Output LMDB file.
+            Output LMDB directory or file.
 
-        write_frequence: int, default=5000
-            The frequency to write back data to disk. Smaller value(s) 
-            reduces memory usage.
+        write_frequence: int, default=1
+            The frequency to write back data to disk. Smaller value 
+            reduces memory usage, at the cost of performance.
         """
-        raise NotImplementedError
+        if isinstance(data, np.ndarray):
+            data = [data]
+        
+        # Check whether directory or full filename is provided. If dir, check 
+        # for "data.mdb" file within dir.
+        isdir = os.path.isdir(path)
+        if isdir:
+            assert not os.path.isfile(os.path.join(path, "data.mdb")), \
+                "LMDB file {} exists!".format(os.path.join(path, "data.mdb"))
+        else:
+            assert not os.path.isfile(path), "LMDB file {} exists!".format(path)
+
+        # It's OK to use super large map_size on Linux, but not on other platforms
+        # See: https://github.com/NVIDIA/DIGITS/issues/206
+        map_size = 1099511627776 * 2 if platform.system() == 'Linux' else 128 * 10**6
+        db = lmdb.open(path, subdir=isdir, map_size=map_size, readonly=False, 
+                       meminit=False, map_async=True) # need sync() at the end
+        
+        # Put data into lmdb, and doubling the size if full.
+        # Ref: https://github.com/NVIDIA/DIGITS/pull/209/files
+        def put_or_grow(txn, key, value):
+            try:
+                txn.put(key, value)
+                return txn
+            except lmdb.MapFullError:
+                pass
+            txn.abort()
+            curr_size = db.info()['map_size']
+            new_size = curr_size * 2
+            print("Doubling LMDB map_size to {0:.2f}GB.".format(new_size / 10**9))
+            db.set_mapsize(new_size)
+            txn = db.begin(write=True)
+            txn = put_or_grow(txn, key, value)
+            return txn
+        
+        # NOTE: LMDB transaction is not exception-safe (even though it has a 
+        # context manager interface).
+        n_examples = data[0].shape[0]
+        txn = db.begin(write=True)
+        for idx in tqdm(range(n_examples), total=n_examples):
+            ex = [arr[idx] for arr in data]
+            txn = put_or_grow(txn, key=u'{:08}'.format(idx).encode('ascii'), 
+                              value=pkl.dumps(ex, protocol=-1))
+            # NOTE: If we do not commit some examples before the db grows, 
+            # those samples do not get saved. As such, for robustness, we 
+            # choose write_frequency=1 (at the cost of performance).
+            if (idx + 1) % write_frequency == 0:
+                txn.commit()
+                txn = db.begin(write=True)
+        txn.commit() # commit all remaining serialized examples
+        
+        # Add all keys used (in this case it is just the idxs)
+        keys = [u'{:08}'.format(k).encode('ascii') for k in range(n_examples)]
+        with db.begin(write=True) as txn:
+            txn = put_or_grow(txn, key=b'__keys__', value=pkl.dumps(keys, protocol=-1))
+
+        print("Flushing database ...")
+        db.sync()
+        db.close()
 
 
     @staticmethod
-    def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, List[np.ndarray]]:
+    def load(path: str, as_numpy: bool=False) -> Union[str, np.ndarray, \
+             List[np.ndarray]]:
         """Load the dataset.
         
         Params:
@@ -152,15 +216,49 @@ class LMDBSerializer(LazySerializer):
 
         as_numpy: bool, default=False
             If True, loads the dataset as a list of np.ndarray's (in 
-            its original form). If False, loads it as a LMDBDatabase.
+            its original form). If False, loads the path dataset is 
+            stored at.
 
         Returns:
         --------
-        data: np.ndarray or list of np.ndarray or LMDBDatabase
-            The dataset (either in its original shape/format or as a 
-            LMDBDataset).
+        data: np.ndarray or list of np.ndarray or DataLoader
+            The dataset (either in its original shape/format or as the 
+            user-defined dataset class).
         """
-        raise NotImplementedError
+        # Check whether directory or full filename is provided. If dir, check 
+        # for "data.mdb" file within dir.
+        isdir = os.path.isdir(path)
+        if isdir:
+            default_path = os.path.join(path, "data.mdb")
+            assert os.path.isfile(default_path), "LMDB default file {} does " \
+                "not exist!".format(default_path)
+        else:
+            assert os.path.isfile(path), "LMDB file {} does not exist!".format(path)
+        
+        if as_numpy:
+            db = lmdb.open(path, subdir=isdir, readonly=True)
+            dataset_dict = {}
+            with db.begin() as txn, txn.cursor() as cursor:
+                keys = pkl.loads(cursor.get(b"__keys__"))
+                for key in keys:
+                    ex = pkl.loads(cursor.get(key))
+                    for idx, arr in enumerate(ex):
+                        name = "arr_{}".format(idx)
+                        reshaped = np.reshape(arr, newshape=[1] + list(arr.shape))
+                        # Concatenate individual examples together into one ndarray.
+                        # NOTE: Value of shape[0] (aka first channel) denotes the total 
+                        # num of examples in the dataset.
+                        if name not in dataset_dict.keys():
+                            dataset_dict[name] = reshaped
+                        else:
+                            dataset_dict[name] = np.vstack((dataset_dict.get(name), reshaped))
+            # Extract np.ndarray's from dict and return in its original form
+            data = [arr for arr in dataset_dict.values()]
+            if len(data) == 1:
+                data = data[0]
+            return data
+        else:
+            return path
 
 
 class NumpySerializer(InMemorySerializer):
@@ -364,7 +462,7 @@ class TFRecordsSerializer(LazySerializer):
                 # NOTE: Assuming arr shape_i's are saved as int64_lists 
                 features[name] = tf.io.FixedLenFeature([], tf.int64)
             else:
-                raise TypeError("Unknown dtype for {} .".format(name))
+                raise TypeError("Unknown dtype for {}.".format(name))
 
         # Parse serialized records into correctly shaped tensors/ndarray's
         if not as_numpy:
