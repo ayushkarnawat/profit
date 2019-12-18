@@ -24,7 +24,7 @@ class GCN(object):
         Number of features per atom in the molecule.
 
     num_outputs: int
-        Number of outputs. This is simply the number of labels.
+        Number of outputs. This is simply the number of unique labels.
 
     units_conv: int, optional, default=128
         Number of filters/units to use in the convolution layer(s).

@@ -1,4 +1,6 @@
 import os
+from typing import List, Union
+
 import numpy as np
 import pandas as pd
 
@@ -10,7 +12,7 @@ from profit.utils.data_utils.cacher import CacheNamePolicy
 
 
 def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/', 
-                 num_data=-1, filetype='h5') -> np.ndarray:
+                 num_data=-1, filetype='h5', as_numpy=False) -> Union[np.ndarray, List[np.ndarray]]:
     """Load pre-processed dataset.
 
     If we are loading a large database, it does not make sense to load 
@@ -69,9 +71,8 @@ def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/',
     # Load data from cache, if it exists
     if data is None:
         print('Loading preprocessed data from cache `{}`'.format(data_path))
-        data = serializer.load(path=data_path)
+        data = serializer.load(path=data_path, as_numpy=as_numpy)
     return data
 
 if __name__ == "__main__":
     data = load_dataset('gcn', 'tertiary', labels='Fitness', num_data=10, filetype='tfrecords')
-    print(data)
