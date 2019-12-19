@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from data import load_dataset
 from profit.models.gcn import GCN
-from profit.dataset.splitters.stratified_splitter import StratifiedSplitter
+from profit.dataset.splitters import split_method_dict
 
 
 # Preprocess + load the dataset
@@ -11,7 +11,7 @@ data = load_dataset('gcn', 'tertiary', labels='Fitness', num_data=10, \
     filetype='tfrecords', as_numpy=True)
 
 # Shuffle, split and batch
-train_idx, val_idx = StratifiedSplitter().train_valid_split(data[0], \
+train_idx, val_idx = split_method_dict['stratified']().train_valid_split(data[0], \
     labels=data[-1].flatten(), return_idxs=True)
 train_data = []
 val_data = []
@@ -34,5 +34,5 @@ labels_std = np.std(labels, axis=0)
 model = GCN(num_atoms, num_feats, num_outputs=num_outputs, std=labels_std).get_model()
 
 # Fit model and report metrics
-model.fit(train_X, train_y, batch_size=5, epochs=5, shuffle=True, 
-          validation_data=(val_X, val_y), verbose=2)
+model.fit(train_X, train_y, batch_size=5, epochs=3, shuffle=True, 
+          validation_data=(val_X, val_y), verbose=1)

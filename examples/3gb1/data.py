@@ -73,6 +73,3 @@ def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/',
         print('Loading preprocessed data from cache `{}`'.format(data_path))
         data = serializer.load(path=data_path, as_numpy=as_numpy)
     return data
-
-if __name__ == "__main__":
-    data = load_dataset('gcn', 'tertiary', labels='Fitness', num_data=10, filetype='tfrecords')
