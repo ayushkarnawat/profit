@@ -1,35 +1,75 @@
-from profit.peptide_builder.polypeptides import one_to_three, is_aa
+"""Different vocab types."""
 
-AA1_VOCAB = {
-    "U": -1, # unknown
-    "X": 0,  # pad
-    "A": 1,
-    "C": 2,
-    "D": 3,
-    "E": 4,
-    "F": 5,
-    "G": 6,
-    "H": 7,
-    "I": 8,
-    "K": 9,
-    "L": 10,
-    "M": 11,
-    "N": 12,
-    "P": 13,
-    "Q": 14,
-    "R": 15,
-    "S": 16,
-    "T": 17,
-    "V": 18,
-    "W": 19,
-    "Y": 20
-}
+from collections import OrderedDict
 
-AA3_VOCAB = {
-    "UNK": -1, # unknown
-    "XXX": 0,  # pad
-}
-AA3_VOCAB.update({one_to_three.get(k):v for k,v in AA1_VOCAB.items() if is_aa(k)})
+# See: https://www.dnastar.com/megalign_help/index.html#!Documents/iupaccodesforaminoacids.htm
+IUPAC_AA_CODES = OrderedDict([
+    ("ALA", "A"),
+    ("ASX", "B"),
+    ("CYS", "C"),
+    ("ASP", "D"),
+    ("GLU", "E"),
+    ("PHE", "F"),
+    ("GLY", "G"),
+    ("HIS", "H"),
+    ("ILE", "I"),
+    ("XLE", "J"),
+    ("LYS", "K"),
+    ("LEU", "L"),
+    ("MET", "M"),
+    ("ASN", "N"),
+    ("PRO", "P"),
+    ("GLN", "Q"),
+    ("ARG", "R"),
+    ("SER", "S"),
+    ("THR", "T"),
+    ("SEC", "U"),
+    ("VAL", "V"),
+    ("TRP", "W"),
+    ("XAA", "X"),
+    ("TYR", "Y"),
+    ("GLX", "Z")
+])
 
-FLIPPED_AA1 = {v:k for k,v in AA1_VOCAB.items()}
-FLIPPED_AA3 = {v:k for k,v in AA3_VOCAB.items()}
+IUPAC_AA1_VOCAB = OrderedDict([
+    ("<pad>", 0),   # padding token
+    ("<mask>", 1),  # hidden (masked) token
+    ("<cls>", 2),   # classification token (beginning of sentence)
+    ("<sep>", 3),   # seperation token (end of sentence)
+    ("<unk>", 4),   # unknown token
+    ("A", 5),
+    ("B", 6),
+    ("C", 7),
+    ("D", 8),
+    ("E", 9),
+    ("F", 10),
+    ("G", 11),
+    ("H", 12),
+    ("I", 13),
+    ("J", 14),
+    ("K", 15),
+    ("L", 16),
+    ("M", 17),
+    ("N", 18),
+    ("O", 19),
+    ("P", 20),
+    ("Q", 21),
+    ("R", 22),
+    ("S", 23),
+    ("T", 24),
+    ("U", 25),
+    ("V", 26),
+    ("W", 27),
+    ("X", 28),
+    ("Y", 29),
+    ("Z", 30)
+])
+
+IUPAC_AA3_VOCAB = OrderedDict([
+    ("<pad>", 0),   # padding token
+    ("<mask>", 1),  # hidden (masked) token
+    ("<cls>", 2),   # classification token (beginning of sentence)
+    ("<sep>", 3),   # seperation token (end of sentence)
+    ("<unk>", 4),   # unknown token
+])
+IUPAC_AA3_VOCAB.update({k:IUPAC_AA1_VOCAB.get(v) for k,v in IUPAC_AA_CODES.items()})

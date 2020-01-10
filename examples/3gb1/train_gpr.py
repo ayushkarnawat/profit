@@ -6,7 +6,7 @@ from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 
 from data import load_dataset
 from profit.dataset.splitters import split_method_dict
-from profit.utils.data_utils.vocabs import FLIPPED_AA1
+from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
 
 
 # Preprocess + load the dataset
@@ -36,7 +36,8 @@ gp.fit(train_X, train_y)
 y_pred, sigma = gp.predict(val_X, return_std=True)
 
 fitness_max_idx = np.argmax(y_pred)
-seq = "".join([FLIPPED_AA1.get(val) for val in val_X[fitness_max_idx]])
+tokenizer = AminoAcidTokenizer('iupac1')
+seq = "".join(tokenizer.decode(val_X[fitness_max_idx]))
 print(np.max(y_pred), seq)
 print(seq[38] + seq[39] + seq[40] + seq[53])
 rmse = np.sqrt(np.mean(np.square((y_pred - val_y)))) * 1.0
