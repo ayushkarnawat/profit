@@ -45,7 +45,6 @@ def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/',
     serializer = serialize_method_dict.get(filetype)()
 
     # Compute features
-    data = None
     if not os.path.exists(data_path):
         # Initalize class(es)
         preprocessor = preprocess_method_dict.get(method)()
@@ -66,10 +65,10 @@ def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/',
 
         # Cache results using default array names
         policy.create_cache_directory()
+        print('Serializing dataset using {}...'.format(type(serializer).__name__))
         serializer.save(data=data, path=data_path)
     
-    # Load data from cache, if it exists
-    if data is None:
-        print('Loading preprocessed data from cache `{}`'.format(data_path))
-        data = serializer.load(path=data_path, as_numpy=as_numpy)
+    # Load data from cache
+    print('Loading preprocessed data from cache `{}`'.format(data_path))
+    data = serializer.load(path=data_path, as_numpy=as_numpy)
     return data

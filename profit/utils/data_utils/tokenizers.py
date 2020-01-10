@@ -119,7 +119,7 @@ class AminoAcidTokenizer(BaseTokenizer):
         """Encode text into ints (based off vocab)."""
         tokens = self.tokenize(text) if isinstance(text, str) else text
         token_ids = self.convert_tokens_to_ids(tokens)
-        return np.array(token_ids, dtype=np.int64)
+        return np.array(token_ids, dtype=np.float)
 
 
     def decode(self, ids: List[int]) -> List[str]:

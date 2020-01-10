@@ -36,9 +36,10 @@ gp.fit(train_X, train_y)
 y_pred, sigma = gp.predict(val_X, return_std=True)
 
 fitness_max_idx = np.argmax(y_pred)
-tokenizer = AminoAcidTokenizer('iupac1')
-seq = "".join(tokenizer.decode(val_X[fitness_max_idx]))
-print(np.max(y_pred), seq)
-print(seq[38] + seq[39] + seq[40] + seq[53])
-rmse = np.sqrt(np.mean(np.square((y_pred - val_y)))) * 1.0
-print(rmse)
+print(fitness_max_idx, val_X[fitness_max_idx])
+# tokenizer = AminoAcidTokenizer('iupac1')
+# seq = "".join(tokenizer.decode(val_X[fitness_max_idx]))
+# print(np.max(y_pred), seq)
+# print(seq[38] + seq[39] + seq[40] + seq[53])
+# rmse = np.sqrt(np.mean(np.square((y_pred - val_y)))) * 1.0
+# print(rmse)
