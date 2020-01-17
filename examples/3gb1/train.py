@@ -11,7 +11,9 @@ data = load_dataset('gcn', 'tertiary', labels='Fitness', num_data=10, \
     filetype='tfrecords', as_numpy=True)
 
 # Shuffle, split and batch
-train_idx, val_idx = split_method_dict['stratified']().train_valid_split(data[0], \
+# https://stackoverflow.com/questions/51125266/how-do-i-split-tensorflow-datasets
+# https://docs.databricks.com/applications/deep-learning/data-prep/tfrecords-to-tensorflow.html
+train_idx, val_idx = split_method_dict['random']().train_valid_split(data[0], \
     labels=data[-1].flatten(), return_idxs=True)
 train_data = []
 val_data = []
@@ -27,6 +29,10 @@ val_y = val_data[-1]
 # Initialize GCN model (really hacky), it also assumes we have the data loaded 
 # in memory, which is the wrong approach. Instead, we should peek into the 
 # shape defined in the TF tensors.
+
+# NOTE: Only use when TfRecordsDataset() (i.e. as_numpy=False) is used
+# num_atoms, num_feats = list(map(int, data.output_shapes[0]))
+# num_outputs = list(map(int, data.output_shapes[0]))[0]
 num_atoms, num_feats = train_data[0].shape[1], train_data[0].shape[2]
 labels = train_data[-1]
 num_outputs = labels.shape[1]
