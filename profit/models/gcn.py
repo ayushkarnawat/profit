@@ -5,10 +5,10 @@ from keras.models import Model
 from keras.optimizers import Adam
 from keras.regularizers import l2
 
-from profit.layers.convs import GraphConvS, GraphConvV
-from profit.layers.embed import GraphEmbed
-from profit.layers.gather import GraphGather
-from profit.layers.nodes import GraphSToS, GraphSToV, GraphVToS, GraphVToV
+from profit.layers.tensorflow.convs import GraphConvS, GraphConvV
+from profit.layers.tensorflow.embed import GraphEmbed
+from profit.layers.tensorflow.gather import GraphGather
+from profit.layers.tensorflow.nodes import GraphSToS, GraphSToV, GraphVToS, GraphVToV
 from profit.utils.training_utils.metrics import std_mae, std_rmse, std_r2
 
 
