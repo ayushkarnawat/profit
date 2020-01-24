@@ -84,9 +84,9 @@ else:
     plt.plot(df.index, df['true'].values, 'r:', label='True')
     plt.plot(train_only.index, train_only['true'].values, 'r.', markersize=10, label='Observations')
     plt.fill(np.concatenate([df.index, df.index[::-1]]),
-            np.concatenate([df['pred'].values - 1.9600 * df['sigma'].values,
+             np.concatenate([df['pred'].values - 1.9600 * df['sigma'].values,
                             (df['pred'].values + 1.9600 * df['sigma'].values)[::-1]]),
-            alpha=.5, fc='b', ec='None', label='95% confidence interval')
+             alpha=.5, fc='b', ec='None', label='95% confidence interval')
 plt.xlabel('Sequence ($x$)')
 plt.ylabel('Fitness ($y$)')
 plt.title('Prediciting protein fitness using GPR (PDB: 3GB1)')
