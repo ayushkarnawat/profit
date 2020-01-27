@@ -1,8 +1,7 @@
 """
 Setup the default profit backend. Allows choice of using pytorch or 
 keras/tensorflow models. Additionally, specifies how the data is 
-formatted (for proper generic dataset lazy loading and batching sets of 
-examples).
+formatted (for generic lazy loading and batching examples).
 
 Adapted from the keras backend: https://git.io/JvqPB
 """
@@ -13,6 +12,9 @@ from __future__ import print_function
 import os
 import sys
 import json
+
+from profit.backend.common import data_format
+from profit.backend.common import set_data_format
 
 
 # Set profit base dir path given PROFIT_HOME env variable, if applicable.
@@ -37,10 +39,10 @@ if os.path.exists(_config_path):
     except ValueError:
         _config = {}
     _backend = _config.get('backend', _BACKEND)
-    _image_data_format = _config.get('data_format', data_format())
-    assert _image_data_format in {'channels_last', 'channels_first'}
+    _data_format = _config.get('data_format', data_format())
+    assert _data_format in {'channels_last', 'channels_first'}
 
-    set_image_data_format(_image_data_format)
+    set_data_format(_data_format)
     _BACKEND = _backend
 
 # Save config file, if possible.
@@ -55,7 +57,7 @@ if not os.path.exists(_profit_dir):
 if not os.path.exists(_config_path):
     _config = {
         'backend': _BACKEND,
-        'data_format': image_data_format()
+        'data_format': data_format()
     }
     try:
         with open(_config_path, 'w') as f:
@@ -63,3 +65,27 @@ if not os.path.exists(_config_path):
     except IOError:
         # Except permission denied.
         pass
+
+# Set backend based on KERAS_BACKEND flag, if applicable.
+if 'PROFIT_BACKEND' in os.environ:
+    _backend = os.environ['PROFIT_BACKEND']
+    if _backend:
+        _BACKEND = _backend
+
+
+def backend() -> str:
+    """Returns the name of the current backend (e.g. "pytorch").
+    
+    Returns:
+    --------
+    backend: str
+        The name of the backend profit is currently using.
+
+    Example:
+    --------
+    ```python
+    >>> profit.backend.backend()
+    'pytorch'
+    ```
+    """
+    return _BACKEND
