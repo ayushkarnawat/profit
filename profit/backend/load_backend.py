@@ -66,7 +66,7 @@ if not os.path.exists(_config_path):
         # Except permission denied.
         pass
 
-# Set backend based on KERAS_BACKEND flag, if applicable.
+# Set backend based on PROFIT_BACKEND flag, if applicable.
 if 'PROFIT_BACKEND' in os.environ:
     _backend = os.environ['PROFIT_BACKEND']
     if _backend:

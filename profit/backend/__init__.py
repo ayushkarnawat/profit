@@ -1,8 +1,3 @@
-"""
-TODO: Fix "Using TensorFlow backend." when importing `profit` module. 
-This confuses the user, as the default backend is the pytorch one.
-"""
-
 from profit.backend import common
 from profit.backend import load_backend
 

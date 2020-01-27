@@ -17,7 +17,7 @@ def data_format() -> str:
     Example:
     --------
     ```python
-    >>> keras.backend.data_format()
+    >>> profit.backend.data_format()
     'channels_first'
     ```
     """
