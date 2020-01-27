@@ -25,7 +25,7 @@ else:
     _profit_base_dir = os.path.expanduser('~')
     if not os.access(_profit_base_dir, os.W_OK):
         _profit_base_dir = '/tmp'
-    _profit_dir = os.path.join(_profit_base_dir, '.keras')
+    _profit_dir = os.path.join(_profit_base_dir, '.profit')
 
 # Default backend: PyTorch.
 _BACKEND = 'pytorch'
