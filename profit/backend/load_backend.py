@@ -39,6 +39,7 @@ if os.path.exists(_config_path):
     except ValueError:
         _config = {}
     _backend = _config.get('backend', _BACKEND)
+    assert _backend in {'pytorch', 'tensorflow'}
     _data_format = _config.get('data_format', data_format())
     assert _data_format in {'channels_last', 'channels_first'}
 
@@ -55,6 +56,7 @@ if not os.path.exists(_profit_dir):
         pass
 
 if not os.path.exists(_config_path):
+    # Use default params
     _config = {
         'backend': _BACKEND,
         'data_format': data_format()
