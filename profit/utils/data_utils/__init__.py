@@ -1,5 +1,6 @@
 from profit.utils.data_utils import cacher
 from profit.utils.data_utils import cast
+from profit.utils.data_utils import datasets
 from profit.utils.data_utils import serializers
 from profit.utils.data_utils import tokenizers
 from profit.utils.data_utils import vocabs
@@ -7,6 +8,15 @@ from profit.utils.data_utils import vocabs
 from profit.utils.data_utils.cacher import CacheNamePolicy
 
 from profit.utils.data_utils.cast import broadcast_array
+
+from profit.utils.data_utils.datasets import TensorflowHDF5Dataset
+from profit.utils.data_utils.datasets import TensorflowLMDBDataset
+from profit.utils.data_utils.datasets import TensorflowNumpyDataset
+from profit.utils.data_utils.datasets import TFRecordsDataset
+from profit.utils.data_utils.datasets import TorchHDF5Dataset
+from profit.utils.data_utils.datasets import TorchLMDBDataset
+from profit.utils.data_utils.datasets import TorchNumpyDataset
+from profit.utils.data_utils.datasets import TorchTFRecordsDataset
 
 from profit.utils.data_utils.serializers import HDF5Serializer
 from profit.utils.data_utils.serializers import LMDBSerializer
