@@ -15,40 +15,165 @@ from torch.utils.data import Dataset
 from profit import backend as P
 
 
-class TensorflowHDF5Dataset(tf.data.Dataset):
+class TensorflowHDF5Dataset(object):
     """Parse (generic) HDF5 dataset into a `tf.data.Dataset` object, 
-    which contains `tf.Tensor`s.  
+    which contains `tf.Tensor`s.
+
+    NOTE: This actually returns a generator, which we pass into 
+    `tf.data.Dataset.from_generator()` to load the `tf.data.Datset` object.
 
     Params:
     -------
     path: str
         HDF5 file which contains dataset.
     """
-    pass
+    
+    def __init__(self, path: str):
+        self.h5file = h5py.File(path, "r")
+        self.keys = list(self.h5file.keys())
+
+        # Retrive first sample to help recover proper types/shapes of ndarrays. 
+        # NOTE: We do not check if all the samples have the same type/shape
+        # since (a) we checked for it when saving the file and (b) it is more 
+        # efficient. However, if the file is modified in between saving and 
+        # loading (see https://w.wiki/GQE), this could lead to potential issues. 
+        # TODO: Do we check if all the samples have the same type/shape?
+        self.example = json.loads(self.h5file.get(self.keys[0])[()])
+
+    def __call__(self):
+        # Yield a dict with "arr_n" as the key and the ndarray as the value
+        for key in self.keys:
+            yield json.loads(self.h5file.get(key)[()])
+
+    @property
+    def output_shapes(self):
+        """Defines the data shapes used to store the dataset. 
+        
+        Helps recover `np.ndarray`s types when loading into a `tf.data.Dataset` 
+        object using `from_generator()`.
+        """
+        return {key: np.array(arr).shape for key, arr in self.example.items()}
+
+    @property
+    def output_types(self):
+        """Defines the data types used to store the dataset. 
+        
+        Helps recover `np.ndarray`s shapes when loading into a `tf.data.Dataset` 
+        object using `from_generator()`.
+        """
+        return {key: tf.float64 for key in self.example.keys()}
 
 
 class TensorflowLMDBDataset(object):
     """Parse (generic) HDF5 dataset into a `tf.data.Dataset` object, 
     which contains `tf.Tensor`s.
+
+    NOTE: This actually returns a generator, which we pass into 
+    `tf.data.Dataset.from_generator()` to load the `tf.data.Datset` object.
     
     Params:
     -------
     path: str
         LMDB file which contains dataset.
     """
-    pass
+    
+    def __init__(self, path: str):
+        # Check whether directory or full filename is provided. If dir, check 
+        # for "data.mdb" file within dir.
+        isdir = os.path.isdir(path)
+        if isdir:
+            default_path = os.path.join(path, "data.mdb")
+            assert os.path.isfile(default_path), "LMDB default file {} does " \
+                "not exist!".format(default_path)
+        else:
+            assert os.path.isfile(path), "LMDB file {} does not exist!".format(path)
+
+        self.db = lmdb.open(path, subdir=isdir, readonly=True, readahead=False)
+
+        # Retrive first sample to help recover proper types/shapes of ndarrays. 
+        # NOTE: We do not check if all the samples have the same type/shape
+        # since (a) we checked for it when saving the file and (b) it is more 
+        # efficient. However, if the file is modified in between saving and 
+        # loading (see https://w.wiki/GQE), this could lead to potential issues. 
+        # TODO: Do we check if all the samples have the same type/shape?
+        with self.db.begin() as txn, txn.cursor() as cursor:
+            self.keys = pkl.loads(cursor.get(b"__keys__"))
+            self.example = {f"arr_{i}": arr for i,arr in enumerate(\
+                pkl.loads(cursor.get(self.keys[0])))}
+
+    def __call__(self):
+        # Yield a dict with "arr_n" as the key and the ndarray as the value
+        with self.db.begin() as txn, txn.cursor() as cursor:
+            for key in self.keys:
+                example = pkl.loads(cursor.get(key))
+                yield {f"arr_{i}":arr for i,arr in enumerate(example)}
+
+    @property
+    def output_shapes(self):
+        """Defines the data shapes used to store the dataset.
+
+        Helps recover `np.ndarray`s types when loading into a `tf.data.Dataset` 
+        object using `from_generator()`.
+        """
+        return {key: arr.shape for key, arr in self.example.items()}
+
+    @property
+    def output_types(self):
+        """Defines the data types used to store the dataset. 
+        
+        Helps recover `np.ndarray`s shapes when loading into a `tf.data.Dataset` 
+        object using `from_generator()`.
+        """
+        return {key: tf.float64 for key in self.example.keys()}
 
 
 class TensorflowNumpyDataset(object):
     """Parse (generic) numpy dataset into a `tf.data.Dataset` object, 
     which contains `tf.Tensor`s.
+
+    NOTE: This actually returns a generator, which we pass into 
+    `tf.data.Dataset.from_generator()` to load the `tf.data.Datset` object.
     
     Params:
     -------
     path: str
         Npz file which contains dataset.
     """
-    pass
+    
+    def __init__(self, path: str):
+        self.npzfile = np.load(path, allow_pickle=False)
+        self.keys = list(self.npzfile.keys())
+
+        # Retrive first sample to help recover proper types/shapes of ndarrays. 
+        # NOTE: We do not check if all the samples have the same type/shape
+        # since (a) we checked for it when saving the file and (b) it is more 
+        # efficient. However, if the file is modified in between saving and 
+        # loading (see https://w.wiki/GQE), this could lead to potential issues. 
+        # TODO: Do we check if all the samples have the same type/shape?
+        self.example = pkl.loads(self.npzfile.get(self.keys[0]))
+
+    def __call__(self):
+        # Yield a dict with "arr_n" as the key and the ndarray as the value
+        for key in self.keys:
+            yield pkl.loads(self.npzfile.get(key))
+
+    @property
+    def output_shapes(self):
+        """Defines the data shapes used to store the dataset. 
+        
+        Helps recover `np.ndarray`s types when loading into a `tf.data.Dataset` 
+        object using `from_generator()`.
+        """
+        return {key: np.array(arr).shape for key, arr in self.example.items()}
+
+    @property
+    def output_types(self):
+        """Defines the data types used to store the dataset. 
+        
+        Helps recover `np.ndarray`s shapes when loading into a `tf.data.Dataset` 
+        object using `from_generator()`.
+        """
+        return {key: tf.float64 for key in self.example.keys()}
 
 
 class TFRecordsDataset(object):
@@ -67,6 +192,9 @@ class TorchHDF5Dataset(Dataset):
     """Parse (generic) HDF5 dataset into a `torch.utils.data.Dataset` 
     object, which contains `torch.Tensor`s.
 
+    NOTE: Regardless of the format the data is saved in, the examples 
+    are always concatenated vertically row-wise (aka first channel).
+
     Params:
     -------
     path: str
@@ -78,24 +206,9 @@ class TorchHDF5Dataset(Dataset):
         self.keys = list(self.h5file.keys())
 
     def __len__(self) -> int:
-        # # Check for same num of examples in the multiple ndarray's 
-        # num_examples = [self.h5file.get(key).shape[0] if P.data_format() == "channels_first"
-        #                 else self.h5file.get(key).shape[-1] for key in self.h5file]
-        # assert num_examples[1:] == num_examples[:-1], \
-        #     "Unequal num of examples - is the data format correct?"
-        # return num_examples[0]
         return len(self.keys)
 
     def __getitem__(self, idx: int) -> Union[torch.Tensor, List[torch.Tensor]]:
-        # # Convert to pytorch tensors
-        # if P.data_format() == "channels_first":
-        #     sample = [torch.from_numpy(self.h5file.get(key)[idx]) 
-        #               for key in self.h5file.keys()]
-        # else: # channels_last
-        #     sample = [torch.from_numpy(self.h5file.get(key)[...,idx]) 
-        #               for key in self.h5file.keys()]
-        # return sample[0] if len(sample) == 1 else sample
-
         # Convert to pytorch tensors
         sample_dict = json.loads(self.h5file.get(self.keys[idx])[()])
         sample = [torch.FloatTensor(arr) for arr in sample_dict.values()]
@@ -106,16 +219,8 @@ class TorchLMDBDataset(Dataset):
     """Parse (generic) LMDB dataset into a `torch.utils.data.Dataset` 
     object, which contains `torch.Tensor`s.
     
-    TODO: Handling of channels_first and channels_last! Need to modify 
-    how db arrays and keys are saved within serializers.py to account 
-    for both channels_first and channels_last! For now, each example 
-    is only stored in first channel in the LMDB serializer.
-    
-    The above approach is wrong since it requires the user to properly 
-    save the dataset in the format they want to read it in again, whether 
-    that be channels_first or channels_last. Rather, we should decouple 
-    the saving and loading (similar to numpy/hdf5) so that one doesn't 
-    depend on the other.
+    NOTE: Regardless of the format the data is saved in, the examples 
+    are always concatenated vertically row-wise (aka first channel).
 
     Params:
     -------
@@ -157,6 +262,9 @@ class TorchNumpyDataset(Dataset):
     """Parse (generic) numpy dataset into a `torch.utils.data.Dataset` 
     object, which contains `torch.Tensor`s.
 
+    NOTE: Regardless of the format the data is saved in, the examples 
+    are always concatenated vertically row-wise (aka first channel).
+
     Params:
     -------
     path: str
@@ -165,21 +273,15 @@ class TorchNumpyDataset(Dataset):
 
     def __init__(self, path: str):
         self.npzfile = np.load(path, allow_pickle=False)
+        self.keys = list(self.npzfile.keys())
 
     def __len__(self) -> int:
-        # Check for same num of examples in the multiple ndarray's 
-        num_examples = [arr.shape[0] if P.data_format() == "channels_first" 
-                        else arr.shape[-1] for arr in self.npzfile.values()]
-        assert num_examples[1:] == num_examples[:-1], \
-            "Unequal num of examples - is the data format correct?"
-        return num_examples[0]
+        return len(self.keys)
 
     def __getitem__(self, idx: int) -> Union[torch.Tensor, List[torch.Tensor]]:
         # Convert to pytorch tensors
-        if P.data_format() == "channels_first":
-            sample = [torch.from_numpy(arr[idx]) for arr in self.npzfile.values()]
-        else: # channels_last
-            sample = [torch.from_numpy(arr[..., idx]) for arr in self.npzfile.values()]
+        sample_dict = pkl.loads(self.npzfile.get(self.keys[idx]))
+        sample = [torch.FloatTensor(arr) for arr in sample_dict.values()]
         return sample[0] if len(sample) == 1 else sample
 
 
@@ -189,6 +291,9 @@ class TorchTFRecordsDataset(Dataset):
     
     Ideally, this should be done without need for using tensorflow. See: 
     https://discuss.pytorch.org/t/read-dataset-from-tfrecord-format/16409
+
+    This seems promising, however requires using another pkg: 
+    https://github.com/vahidk/tfrecord
 
     Params:
     -------
@@ -207,12 +312,97 @@ class TorchTFRecordsDataset(Dataset):
 
 
 if __name__ == "__main__":
-    P.set_data_format('channels_first')
-    torch_dataset = TorchHDF5Dataset("data/3gb1/processed/transformer_fitness/primary5.h5")
+    # from torch.utils.data import DataLoader
+    # torch_dataset = TorchHDF5Dataset("data/3gb1/processed/transformer_fitness/primary5.h5")
     # torch_dataset = TorchLMDBDataset("data/3gb1/processed/transformer_fitness/primary.mdb")
     # torch_dataset = TorchNumpyDataset("data/3gb1/processed/transformer_fitness/primary5.npz")
     # torch_dataset = TorchTFRecordsDataset("data/3gb1/processed/transformer_fitness/primary.tfrecords")
     # sample = torch_dataset[755]
-    for i in range(len(torch_dataset)): 
-        sample = torch_dataset[i] 
-        print(i, [tensor.shape for tensor in sample])
+    # for i in range(len(torch_dataset)): 
+    #     sample = torch_dataset[i]
+    #     print(i, [tensor.shape for tensor in sample])
+    # loader = DataLoader(dataset, batch_size=2)
+    # for i_batch, sample_batched in enumerate(loader):
+    #     print(i_batch, [arr.shape for arr in sample_batched])
+
+    # Load the dataset
+    import os
+    from typing import List, Union
+
+    import numpy as np
+    import pandas as pd
+
+    from profit.dataset.parsers.data_frame_parser import DataFrameParser
+    from profit.dataset.preprocessing.mutator import PDBMutator
+    from profit.dataset.preprocessors import preprocess_method_dict
+    from profit.utils.data_utils import serialize_method_dict
+    from profit.utils.data_utils.cacher import CacheNamePolicy
+
+
+    def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/', 
+                    num_data=-1, filetype='h5', as_numpy=False) -> Union[np.ndarray, List[np.ndarray]]:
+        """Load pre-processed dataset.
+
+        Returns:
+        --------
+        data: list of np.ndarray (multiple) or np.ndarray (single) or str
+            List of np.ndarray if filetype saved in 'npy', 'npz', 'h5', or 
+            'hdf5' format. If saved into a database (e.g. tfrecords or 
+            lmdb), the filepath where database is saved is returned.
+        """
+        policy = CacheNamePolicy(method, mutator_fmt, labels, rootdir=rootdir, 
+                                num_data=num_data, filetype=filetype)
+        data_path = policy.get_data_file_path()
+        serializer = serialize_method_dict.get(filetype)()
+
+        # Compute features
+        if not os.path.exists(data_path):
+            # Initalize class(es)
+            preprocessor = preprocess_method_dict.get(method)()
+            mutator = PDBMutator(fmt=mutator_fmt) if mutator_fmt else None
+            print('Preprocessing dataset using {}...'.format(type(preprocessor).__name__))
+
+            # Preprocess dataset w/ mutations if requested
+            target_index = np.arange(num_data) if num_data >= 0 else None
+            df = pd.read_csv('data/3gb1/raw/fitness570.csv', sep=',')
+            if 'PDBID' not in list(df.columns):
+                df['PDBID'] = ['3gb1' for _ in range(len(df))] 
+            if 'Positions' not in list(df.columns):
+                df['Positions'] = [[39, 40, 41, 54] for _ in range(len(df))]
+            parser = DataFrameParser(preprocessor, mutator, data_col='Variants', \
+                pdb_col='PDBID', pos_col='Positions', labels=labels, \
+                process_as_seq=True)
+            data = parser.parse(df, target_index=target_index)['dataset']
+
+            # Cache results using default array names
+            policy.create_cache_directory()
+            print('Serializing dataset using {}...'.format(type(serializer).__name__))
+            serializer.save(data=data, path=data_path)
+        
+        # Load data from cache
+        print('Loading preprocessed data from cache `{}`'.format(data_path))
+        data = serializer.load(path=data_path, as_numpy=as_numpy)
+        return data
+
+    dataset = load_dataset('transformer', 'primary', labels='Fitness', num_data=2, \
+        filetype='mdb', as_numpy=False)
+
+    print(isinstance(dataset, torch.utils.data.Dataset))
+    loader = DataLoader(dataset, batch_size=1)
+    for i_batch, sample_batched in enumerate(loader):
+        print(i_batch, [arr.shape for arr in sample_batched])
+    # # Transpose to make it channels_last
+    # dataset = [arr.T for arr in dataset]
+    # print([arr.shape for arr in dataset])
+
+    # P.set_data_format('channels_last')
+    # serializer = serialize_method_dict.get('npz')
+    # serializer.save(dataset, path="test.npz")
+
+    # torch_dataset = TorchNumpyDataset('test.npz')
+    # loader = DataLoader(torch_dataset, batch_size=2)
+    # for i_batch, sample_batched in enumerate(loader):
+    #     print(i_batch, [arr.shape for arr in sample_batched])
+    # for i in range(len(torch_dataset)): 
+    #     sample = torch_dataset[i]
+    #     print(i, [tensor.shape for tensor in sample])

@@ -1,4 +1,5 @@
 import os
+import json
 import platform
 
 from abc import abstractmethod, ABC
@@ -12,6 +13,16 @@ import pickle as pkl
 import tensorflow as tf
 
 from tqdm import tqdm
+from torch.utils.data import Dataset as TorchDataset
+from tensorflow.data import Dataset as TensorflowDataset
+
+from profit import backend as P
+from profit.utils.data_utils.datasets import TensorflowHDF5Dataset
+from profit.utils.data_utils.datasets import TensorflowLMDBDataset
+from profit.utils.data_utils.datasets import TensorflowNumpyDataset
+from profit.utils.data_utils.datasets import TorchHDF5Dataset
+from profit.utils.data_utils.datasets import TorchLMDBDataset
+from profit.utils.data_utils.datasets import TorchNumpyDataset
 
 
 class BaseSerializer(ABC):
@@ -70,8 +81,7 @@ class HDF5Serializer(InMemorySerializer):
     """
 
     @staticmethod
-    def save(data: Union[np.ndarray, List[np.ndarray]], path: str, 
-             compress: bool=True) -> None:
+    def save(data: Union[np.ndarray, List[np.ndarray]], path: str) -> None:
         """Save data to .h5 (or .hdf5) file.
         
         Params:
@@ -81,23 +91,36 @@ class HDF5Serializer(InMemorySerializer):
 
         path: str
             Output HDF5 file.
-
-        compress: bool, default=True
-            If True, uses gzip to compress the file. If False, no 
-            compression is performed.
         """
         if isinstance(data, np.ndarray):
             data = [data]
 
-        compression = "gzip" if compress else None
         with h5py.File(path, "w") as h5file:
-            for idx, arr in enumerate(data):
-                h5file.create_dataset(name="arr_{}".format(idx), data=arr, \
-                    chunks=True, compression=compression)
-        
+            # Check for same num of examples in the multiple ndarray's 
+            num_examples = [arr.shape[0] if P.data_format() == "channels_first" 
+                            else arr.shape[-1] for arr in data]
+            assert num_examples[1:] == num_examples[:-1], \
+                "Unequal num of examples - is the data format correct?"
+
+            for idx in range(num_examples[0]):  
+                # NOTE: Since numpy cannot serialize lists of np.arrays together 
+                # for each individual example, we have to store them as a JSON 
+                # object. Each example, which is denoted by a key, contains a 
+                # dict with the key names being "arr_0", ..., "arr_n" based on 
+                # which array it is referencing. Additionally, each ndarray has 
+                # to be converted to lists of lists for proper storage.
+                example = {f"arr_{i}": arr[idx].tolist() if P.data_format() == \
+                    "channels_first" else arr[...,idx].tolist() for i,arr in enumerate(data)}
+                key = u'{:08}'.format(idx).encode('ascii')
+
+                # Convert dict to str so that json.loads() can recover 
+                # info correctly when loading.
+                h5file.create_dataset(name=key, data=json.dumps(example))
+
 
     @staticmethod
-    def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, List[np.ndarray]]:
+    def load(path: str, as_numpy: bool=False) -> Union[List[np.ndarray], \
+            np.ndarray, TorchDataset, TensorflowDataset]:
         """Load the dataset.
         
         Params:
@@ -106,23 +129,47 @@ class HDF5Serializer(InMemorySerializer):
             HDF5 file which contains dataset.
 
         as_numpy: bool, default=False
-            Ignored; always loads into np.ndarray's. Exists for 
-            compatability with other serializers.
+            If True, loads the dataset as a list of np.ndarray's (in 
+            its original form). If False, loads the dataset in  
+            P.backend()'s specified format.
 
         Returns:
         --------
-        data: np.ndarray or list of np.ndarray
-            The dataset (in its original shape/format).
+        data: np.ndarray, torch.utils.data.Dataset, or tf.data.Dataset
+            The dataset (either in its original shape/format or in 
+            P.backend()'s specified format).
         """
-        with h5py.File(path, "r") as h5file:
-            data = [h5file.get(key)[:] for key in list(h5file.keys())]
-        return data[0] if len(data) == 1 else data
+        if as_numpy:
+            dataset_dict = {}
+            with h5py.File(path, "r") as h5file:
+                for key in list(h5file.keys()):
+                    example = json.loads(h5file.get(key)[()])
+                    for name, arr in example.items():
+                        arr = np.array(arr)
+                        newshape = [1] + list(arr.shape) if P.data_format() == \
+                            "channels_first" else list(arr.shape) + [1]
+                        reshaped = np.reshape(arr, newshape=newshape)
+                        # Concatenate individual examples together into one ndarray.
+                        if name not in dataset_dict.keys():
+                            dataset_dict[name] = reshaped
+                        else:
+                            dataset_dict[name] = np.vstack((dataset_dict.get(name), reshaped)) \
+                                if P.data_format() == "channels_first" \
+                                else np.hstack((dataset_dict.get(name), reshaped))
+            # Extract np.ndarray's from dict and return in its original form
+            data = [arr for arr in dataset_dict.values()]
+            return data[0] if len(data) == 1 else data
+        if P.backend() == "pytorch":
+            return TorchHDF5Dataset(path)
+        else:
+            dsgen = TensorflowHDF5Dataset(path)
+            return tf.data.Dataset.from_generator(dsgen, dsgen.output_types, dsgen.output_shapes)
 
 
 class LMDBSerializer(LazySerializer):
     """Serialize ndarray's to a LMDB database.
     
-    The keys are idx, and the values are the list of serialized ndarrays.
+    The keys are idxs, and the values are the list of serialized ndarrays.
     """
 
     @staticmethod
@@ -145,6 +192,12 @@ class LMDBSerializer(LazySerializer):
         """
         if isinstance(data, np.ndarray):
             data = [data]
+
+        # Check for same num of examples in the multiple ndarray's 
+        num_examples = [arr.shape[0] if P.data_format() == "channels_first" 
+                        else arr.shape[-1] for arr in data]
+        assert num_examples[1:] == num_examples[:-1], \
+            "Unequal num of examples - is the data format correct?"
         
         # Check whether directory or full filename is provided. If dir, check 
         # for "data.mdb" file within dir.
@@ -180,12 +233,13 @@ class LMDBSerializer(LazySerializer):
         
         # NOTE: LMDB transaction is not exception-safe (even though it has a 
         # context manager interface).
-        n_examples = data[0].shape[0]
+        n_examples = num_examples[0]
         txn = db.begin(write=True)
         for idx in tqdm(range(n_examples), total=n_examples):
-            ex = [arr[idx] for arr in data]
+            example = [arr[idx] if P.data_format() == "channels_first" 
+                       else arr[...,idx] for arr in data]
             txn = put_or_grow(txn, key=u'{:08}'.format(idx).encode('ascii'), 
-                              value=pkl.dumps(ex, protocol=-1))
+                              value=pkl.dumps(example, protocol=-1))
             # NOTE: If we do not commit some examples before the db grows, 
             # those samples do not get saved. As such, for robustness, we 
             # choose write_frequency=1 (at the cost of performance).
@@ -205,8 +259,8 @@ class LMDBSerializer(LazySerializer):
 
 
     @staticmethod
-    def load(path: str, as_numpy: bool=False) -> Union[str, np.ndarray, \
-             List[np.ndarray]]:
+    def load(path: str, as_numpy: bool=False) -> Union[List[np.ndarray], \
+            np.ndarray, TorchDataset, TensorflowDataset]:
         """Load the dataset.
         
         Params:
@@ -216,14 +270,14 @@ class LMDBSerializer(LazySerializer):
 
         as_numpy: bool, default=False
             If True, loads the dataset as a list of np.ndarray's (in 
-            its original form). If False, loads the path dataset is 
-            stored at.
+            its original form). If False, loads the dataset in  
+            P.backend()'s specified format.
 
         Returns:
         --------
-        data: np.ndarray or list of np.ndarray or DataLoader
-            The dataset (either in its original shape/format or as the 
-            user-defined dataset class).
+        data: np.ndarray, torch.utils.data.Dataset, or tf.data.Dataset
+            The dataset (either in its original shape/format or in 
+            P.backend()'s specified format).
         """
         # Check whether directory or full filename is provided. If dir, check 
         # for "data.mdb" file within dir.
@@ -241,24 +295,27 @@ class LMDBSerializer(LazySerializer):
             with db.begin() as txn, txn.cursor() as cursor:
                 keys = pkl.loads(cursor.get(b"__keys__"))
                 for key in keys:
-                    ex = pkl.loads(cursor.get(key))
-                    for idx, arr in enumerate(ex):
+                    example = pkl.loads(cursor.get(key))
+                    for idx, arr in enumerate(example):
                         name = "arr_{}".format(idx)
-                        reshaped = np.reshape(arr, newshape=[1] + list(arr.shape))
+                        newshape = [1] + list(arr.shape) if P.data_format() == \
+                            "channels_first" else list(arr.shape) + [1]
+                        reshaped = np.reshape(arr, newshape=newshape)
                         # Concatenate individual examples together into one ndarray.
-                        # NOTE: Value of shape[0] (aka first channel) denotes the total 
-                        # num of examples in the dataset.
                         if name not in dataset_dict.keys():
                             dataset_dict[name] = reshaped
                         else:
-                            dataset_dict[name] = np.vstack((dataset_dict.get(name), reshaped))
+                            dataset_dict[name] = np.vstack((dataset_dict.get(name), reshaped)) \
+                                if P.data_format() == "channels_first" \
+                                else np.hstack((dataset_dict.get(name), reshaped))
             # Extract np.ndarray's from dict and return in its original form
             data = [arr for arr in dataset_dict.values()]
-            if len(data) == 1:
-                data = data[0]
-            return data
+            return data[0] if len(data) == 1 else data
+        if P.backend() == "pytorch":
+            return TorchLMDBDataset(path)
         else:
-            return path
+            dsgen = TensorflowLMDBDataset(path)
+            return tf.data.Dataset.from_generator(dsgen, dsgen.output_types, dsgen.output_shapes)
 
 
 class NumpySerializer(InMemorySerializer):
@@ -287,11 +344,34 @@ class NumpySerializer(InMemorySerializer):
         """
         if isinstance(data, np.ndarray):
             data = [data]
-        np.savez_compressed(path, *data) if compress else np.savez(path, *data)
+
+        # Check for same num of examples in the multiple ndarray's 
+        num_examples = [arr.shape[0] if P.data_format() == "channels_first" 
+                        else arr.shape[-1] for arr in data]
+        assert num_examples[1:] == num_examples[:-1], \
+            "Unequal num of examples - is the data format correct?"
+
+        dataset_dict = {}
+        for idx in range(num_examples[0]):
+            # NOTE: Since numpy cannot serialize lists of np.arrays together 
+            # for each individual example, we have to store them as a dict 
+            # object. Each example, which is denoted by a key, contains a 
+            # dict with the key names being "arr_0", ..., "arr_n" based on 
+            # which array it is referencing. Additionally, each ndarray has 
+            # to be converted to lists of lists for proper storage.
+            example = {f"arr_{i}": arr[idx].tolist() if P.data_format() == \
+                "channels_first" else arr[...,idx].tolist() for i,arr in enumerate(data)}
+            key = u'{:08}'.format(idx)
+            dataset_dict[key] = pkl.dumps(example)
+
+        # Save each example (denoted by key) seperately
+        np.savez_compressed(path, **dataset_dict) if compress \
+            else np.savez(path, **dataset_dict)
         
 
     @staticmethod
-    def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, List[np.ndarray]]:
+    def load(path: str, as_numpy: bool=False) -> Union[List[np.ndarray], \
+            np.ndarray, TorchDataset, TensorflowDataset]:
         """Load the dataset.
         
         Params:
@@ -300,17 +380,41 @@ class NumpySerializer(InMemorySerializer):
             Npz file which contains dataset.
 
         as_numpy: bool, default=False
-            Ignored; always loads into np.ndarray's. Exists for 
-            compatability with other serializers.
+            If True, loads the dataset as a list of np.ndarray's (in 
+            its original form). If False, loads the dataset in  
+            P.backend()'s specified format.
 
         Returns:
         --------
-        data: np.ndarray or list of np.ndarray
-            The dataset (in its original shape/format).
+        data: np.ndarray, torch.utils.data.Dataset, or tf.data.Dataset
+            The dataset (either in its original shape/format or in 
+            P.backend()'s specified format).
         """
-        with np.load(path, allow_pickle=False) as npzfile:
-            data = [arr[:] for arr in list(npzfile.values())]
-        return data[0] if len(data) == 1 else data
+        if as_numpy:
+            dataset_dict = {}
+            with np.load(path, allow_pickle=False) as npzfile:
+                for key in list(npzfile.keys()):
+                    example = pkl.loads(npzfile.get(key))
+                    for name, arr in example.items():
+                        arr = np.array(arr)
+                        newshape = [1] + list(arr.shape) if P.data_format() == \
+                            "channels_first" else list(arr.shape) + [1]
+                        reshaped = np.reshape(arr, newshape=newshape)
+                        # Concatenate individual examples together into one ndarray.
+                        if name not in dataset_dict.keys():
+                            dataset_dict[name] = reshaped
+                        else:
+                            dataset_dict[name] = np.vstack((dataset_dict.get(name), reshaped)) \
+                                if P.data_format() == "channels_first" \
+                                else np.hstack((dataset_dict.get(name), reshaped))
+            # Extract np.ndarray's from dict and return in its original form
+            data = [arr for arr in dataset_dict.values()]
+            return data[0] if len(data) == 1 else data
+        if P.backend() == "pytorch":
+            return TorchNumpyDataset(path)
+        else:
+            dsgen = TensorflowNumpyDataset(path)
+            return tf.data.Dataset.from_generator(dsgen, dsgen.output_types, dsgen.output_shapes)
 
 
 class TFRecordsSerializer(LazySerializer):
@@ -397,7 +501,7 @@ class TFRecordsSerializer(LazySerializer):
     
     @staticmethod
     def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, \
-        List[np.ndarray], tf.data.TFRecordDataset]:
+            List[np.ndarray], tf.data.TFRecordDataset]:
         """Load the dataset.
 
         Assumes that each np.ndarray is saved under default names 
