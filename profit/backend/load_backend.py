@@ -3,6 +3,13 @@ Setup the default profit backend. Allows choice of using pytorch or
 keras/tensorflow models. Additionally, specifies how the data is 
 formatted (for generic lazy loading and batching examples).
 
+NOTE: We do not have a `set_backend()` function as, if the user decides 
+to change the backend in the middle of the script/program, that would 
+mess up the computation. To prevent such an occurence, it is RECOMMENED 
+that the user modify the `backend` key within the `~/.profit.profit.json` 
+file. This will (re)load the specified backend before any computations 
+have been performed.
+
 Adapted from the keras backend: https://git.io/JvqPB
 """
 
