@@ -61,7 +61,7 @@ class TensorflowHDF5Dataset(object):
         Helps recover `np.ndarray`s shapes when loading into a `tf.data.Dataset` 
         object using `from_generator()`.
         """
-        return {key: tf.float64 for key in self.example.keys()}
+        return {key: tf.float32 for key in self.example.keys()}
 
 
 class TensorflowLMDBDataset(object):
@@ -124,7 +124,7 @@ class TensorflowLMDBDataset(object):
         Helps recover `np.ndarray`s shapes when loading into a `tf.data.Dataset` 
         object using `from_generator()`.
         """
-        return {key: tf.float64 for key in self.example.keys()}
+        return {key: tf.float32 for key in self.example.keys()}
 
 
 class TensorflowNumpyDataset(object):
@@ -173,11 +173,11 @@ class TensorflowNumpyDataset(object):
         Helps recover `np.ndarray`s shapes when loading into a `tf.data.Dataset` 
         object using `from_generator()`.
         """
-        return {key: tf.float64 for key in self.example.keys()}
+        return {key: tf.float32 for key in self.example.keys()}
 
 
 class TFRecordsDataset(object):
-    """Parse (generic) tensorflow dataset into a `tf.data.Dataset` object, 
+    """Parse (generic) TFRecords file into a `tf.data.Dataset` object, 
     which contains `tf.Tensor`s.
     
     Params:
