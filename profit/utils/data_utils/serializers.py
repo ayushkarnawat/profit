@@ -96,11 +96,13 @@ class HDF5Serializer(InMemorySerializer):
             data = [data]
 
         with h5py.File(path, "w") as h5file:
-            # Check for same num of examples in the multiple ndarray's 
-            num_examples = [arr.shape[0] if P.data_format() == "channels_first" 
-                            else arr.shape[-1] for arr in data]
-            assert num_examples[1:] == num_examples[:-1], \
-                "Unequal num of examples - is the data format correct?"
+            # Check for same num of examples in the multiple ndarray's
+            shapes = [arr.shape for arr in data]
+            axis = 0 if P.data_format() == "channels_first" else -1
+            num_examples = [shape[axis] for shape in shapes]
+            if num_examples[1:] != num_examples[:-1]:
+                raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
+                    f"(axis={axis}): {shapes} - is the data format correct?")
 
             for idx in range(num_examples[0]):  
                 # NOTE: Since numpy cannot serialize lists of np.arrays together 
@@ -193,11 +195,13 @@ class LMDBSerializer(LazySerializer):
         if isinstance(data, np.ndarray):
             data = [data]
 
-        # Check for same num of examples in the multiple ndarray's 
-        num_examples = [arr.shape[0] if P.data_format() == "channels_first" 
-                        else arr.shape[-1] for arr in data]
-        assert num_examples[1:] == num_examples[:-1], \
-            "Unequal num of examples - is the data format correct?"
+        # Check for same num of examples in the multiple ndarray's
+        shapes = [arr.shape for arr in data]
+        axis = 0 if P.data_format() == "channels_first" else -1
+        num_examples = [shape[axis] for shape in shapes]
+        if num_examples[1:] != num_examples[:-1]:
+            raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
+                f"(axis={axis}): {shapes} - is the data format correct?")
         
         # Check whether directory or full filename is provided. If dir, check 
         # for "data.mdb" file within dir.
@@ -345,11 +349,13 @@ class NumpySerializer(InMemorySerializer):
         if isinstance(data, np.ndarray):
             data = [data]
 
-        # Check for same num of examples in the multiple ndarray's 
-        num_examples = [arr.shape[0] if P.data_format() == "channels_first" 
-                        else arr.shape[-1] for arr in data]
-        assert num_examples[1:] == num_examples[:-1], \
-            "Unequal num of examples - is the data format correct?"
+        # Check for same num of examples in the multiple ndarray's
+        shapes = [arr.shape for arr in data]
+        axis = 0 if P.data_format() == "channels_first" else -1
+        num_examples = [shape[axis] for shape in shapes]
+        if num_examples[1:] != num_examples[:-1]:
+            raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
+                f"(axis={axis}): {shapes} - is the data format correct?")
 
         dataset_dict = {}
         for idx in range(num_examples[0]):
@@ -474,6 +480,16 @@ class TFRecordsSerializer(LazySerializer):
 
         if isinstance(data, np.ndarray):
             data = [data]
+
+        # Check for same num of examples in the multiple ndarray's
+        # TODO: Make tensorflow support different data formats, currently only 
+        # supports channels_first. NOTE: Will break if using channels_last!
+        shapes = [arr.shape for arr in data]
+        axis = 0 if P.data_format() == "channels_first" else -1
+        num_examples = [shape[axis] for shape in shapes]
+        if num_examples[1:] != num_examples[:-1]:
+            raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
+                f"(axis={axis}): {shapes} - is the data format correct?")
 
         # Add shapes of each array in the dataset (for a single example). Hack 
         # to allow serialized data to be reshaped properly when loaded.
