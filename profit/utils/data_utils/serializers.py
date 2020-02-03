@@ -514,7 +514,34 @@ class TFRecordsSerializer(LazySerializer):
                                         "_type": _bytes_feature}
                 writer.write(_serialize(example))
 
-    
+        # TODO: NEW ONE BELOW. Accounts for channels_first and channels_last!
+
+        # Add shapes of each array in the dataset (for a single example). Hack 
+        # to allow serialized data to be reshaped properly when loaded.
+        shapes = {f"shape_{idx}": np.array(arr.shape[1:]) if P.data_format() == "channels_first" 
+                  else np.array(arr.shape[:-1]) for idx, arr in enumerate(data)}
+        dataset = {"arr_{}".format(idx): arr for idx, arr in enumerate(data)}
+        dataset.update(shapes)
+
+        # Write serialized example(s) into the dataset
+        n_examples = data[0].shape[axis]
+        with tf.io.TFRecordWriter(path) as writer:
+            for row in tqdm(range(n_examples), total=n_examples):
+                # NOTE: tobytes() flattens an ndarray. We have to flatten it 
+                # because tf _bytes_feature() only takes in bytes. To combat 
+                # this, we save each ndarray's shape as well (see above).
+                example = {}
+                for key, nparr in dataset.items():
+                    # Save metadata about the array (aka shape) as int64 feature
+                    if key.startswith("shape"):
+                        example[key] = {"data": nparr, "_type": _int64_feature}
+                    else:
+                        example[key] = {"data": nparr[row].tobytes() if P.data_format() \
+                            == "channels_first" else nparr[...,row].tobytes(), 
+                                        "_type": _bytes_feature}
+                writer.write(_serialize(example))
+
+
     @staticmethod
     def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, \
             List[np.ndarray], tf.data.TFRecordDataset]:
