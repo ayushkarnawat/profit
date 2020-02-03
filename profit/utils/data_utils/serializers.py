@@ -162,11 +162,8 @@ class HDF5Serializer(InMemorySerializer):
             # Extract np.ndarray's from dict and return in its original form
             data = [arr for arr in dataset_dict.values()]
             return data[0] if len(data) == 1 else data
-        if P.backend() == "pytorch":
-            return TorchHDF5Dataset(path)
-        else:
-            dsgen = TensorflowHDF5Dataset(path)
-            return tf.data.Dataset.from_generator(dsgen, dsgen.output_types, dsgen.output_shapes)
+        return TorchHDF5Dataset(path) if P.backend() == "pytorch" \
+            else TensorflowHDF5Dataset(path)
 
 
 class LMDBSerializer(LazySerializer):
@@ -316,11 +313,8 @@ class LMDBSerializer(LazySerializer):
             # Extract np.ndarray's from dict and return in its original form
             data = [arr for arr in dataset_dict.values()]
             return data[0] if len(data) == 1 else data
-        if P.backend() == "pytorch":
-            return TorchLMDBDataset(path)
-        else:
-            dsgen = TensorflowLMDBDataset(path)
-            return tf.data.Dataset.from_generator(dsgen, dsgen.output_types, dsgen.output_shapes)
+        return TorchLMDBDataset(path) if P.backend() == "pytorch" \
+            else TensorflowLMDBDataset(path)
 
 
 class NumpySerializer(InMemorySerializer):
@@ -418,11 +412,8 @@ class NumpySerializer(InMemorySerializer):
             # Extract np.ndarray's from dict and return in its original form
             data = [arr for arr in dataset_dict.values()]
             return data[0] if len(data) == 1 else data
-        if P.backend() == "pytorch":
-            return TorchNumpyDataset(path)
-        else:
-            dsgen = TensorflowNumpyDataset(path)
-            return tf.data.Dataset.from_generator(dsgen, dsgen.output_types, dsgen.output_shapes)
+        return TorchNumpyDataset(path) if P.backend() == "pytorch" \
+            else TensorflowNumpyDataset(path)
 
 
 class TFRecordsSerializer(LazySerializer):

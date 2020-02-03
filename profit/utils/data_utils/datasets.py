@@ -15,165 +15,198 @@ from torch.utils.data import Dataset
 from profit import backend as P
 
 
-class TensorflowHDF5Dataset(object):
+def TensorflowHDF5Dataset(path: str) -> tf.data.Dataset:
     """Parse (generic) HDF5 dataset into a `tf.data.Dataset` object, 
     which contains `tf.Tensor`s.
-
-    NOTE: This actually returns a generator, which we pass into 
-    `tf.data.Dataset.from_generator()` to load the `tf.data.Datset` object.
 
     Params:
     -------
     path: str
         HDF5 file which contains dataset.
-    """
     
-    def __init__(self, path: str):
-        self.h5file = h5py.File(path, "r")
-        self.keys = list(self.h5file.keys())
-
-        # Retrive first sample to help recover proper types/shapes of ndarrays. 
-        # NOTE: We do not check if all the samples have the same type/shape
-        # since (a) we checked for it when saving the file and (b) it is more 
-        # efficient. However, if the file is modified in between saving and 
-        # loading (see https://w.wiki/GQE), this could lead to potential issues. 
-        # TODO: Do we check if all the samples have the same type/shape?
-        self.example = json.loads(self.h5file.get(self.keys[0])[()])
-
-    def __call__(self):
-        # Yield a dict with "arr_n" as the key and the ndarray as the value
-        for key in self.keys:
-            yield json.loads(self.h5file.get(key)[()])
-
-    @property
-    def output_shapes(self):
-        """Defines the data shapes used to store the dataset. 
+    Returns:
+    --------
+    dataset: tf.data.Dataset
+        Dataset loaded into its `tf.data.Dataset` form.
+    """
+    class HDF5DatasetGenerator(object):
+        """Generates dataset examples contained in a .h5/.hdf5 file. 
         
-        Helps recover `np.ndarray`s types when loading into a `tf.data.Dataset` 
-        object using `from_generator()`.
+        NOTE: We pass this object into `tf.data.Dataset.from_generator()` 
+        to load the `tf.data.Dataset` object.
         """
-        return {key: np.array(arr).shape for key, arr in self.example.items()}
 
-    @property
-    def output_types(self):
-        """Defines the data types used to store the dataset. 
-        
-        Helps recover `np.ndarray`s shapes when loading into a `tf.data.Dataset` 
-        object using `from_generator()`.
-        """
-        return {key: tf.float32 for key in self.example.keys()}
+        def __init__(self, path: str):
+            self.h5file = h5py.File(path, "r")
+            self.keys = list(self.h5file.keys())
+
+            # Retrive first sample to help recover proper types/shapes of ndarrays. 
+            # NOTE: We do not check if all the samples have the same type/shape
+            # since (a) we checked for it when saving the file and (b) it is more 
+            # efficient. However, if the file is modified in between saving and 
+            # loading (see https://w.wiki/GQE), this could lead to potential issues. 
+            # TODO: Do we check if all the samples have the same type/shape?
+            self.example = json.loads(self.h5file.get(self.keys[0])[()])
+
+        def __call__(self):
+            # Yield a dict with "arr_n" as the key and the ndarray as the value
+            for key in self.keys:
+                yield json.loads(self.h5file.get(key)[()])
+
+        @property
+        def output_shapes(self):
+            """Defines the data shapes used to store the dataset. 
+            
+            Helps recover `np.ndarray`s types when loading into a 
+            `tf.data.Dataset` object using `from_generator()`.
+            """
+            return {key: np.array(arr).shape for key, arr in self.example.items()}
+
+        @property
+        def output_types(self):
+            """Defines the data types used to store the dataset. 
+            
+            Helps recover `np.ndarray`s shapes when loading into a 
+            `tf.data.Dataset` object using `from_generator()`.
+            """
+            return {key: tf.float32 for key in self.example.keys()}
+
+    dsg = HDF5DatasetGenerator(path)
+    return tf.data.Dataset.from_generator(dsg, dsg.output_types, dsg.output_shapes)
 
 
-class TensorflowLMDBDataset(object):
-    """Parse (generic) HDF5 dataset into a `tf.data.Dataset` object, 
+def TensorflowLMDBDataset(path: str) -> tf.data.Dataset:
+    """Parse (generic) LMDB dataset into a `tf.data.Dataset` object, 
     which contains `tf.Tensor`s.
 
-    NOTE: This actually returns a generator, which we pass into 
-    `tf.data.Dataset.from_generator()` to load the `tf.data.Datset` object.
-    
     Params:
     -------
     path: str
         LMDB file which contains dataset.
+
+    Returns:
+    --------
+    dataset: tf.data.Dataset
+        Dataset loaded into its `tf.data.Dataset` form.
     """
-    
-    def __init__(self, path: str):
-        # Check whether directory or full filename is provided. If dir, check 
-        # for "data.mdb" file within dir.
-        isdir = os.path.isdir(path)
-        if isdir:
-            default_path = os.path.join(path, "data.mdb")
-            assert os.path.isfile(default_path), "LMDB default file {} does " \
-                "not exist!".format(default_path)
-        else:
-            assert os.path.isfile(path), "LMDB file {} does not exist!".format(path)
-
-        self.db = lmdb.open(path, subdir=isdir, readonly=True, readahead=False)
-
-        # Retrive first sample to help recover proper types/shapes of ndarrays. 
-        # NOTE: We do not check if all the samples have the same type/shape
-        # since (a) we checked for it when saving the file and (b) it is more 
-        # efficient. However, if the file is modified in between saving and 
-        # loading (see https://w.wiki/GQE), this could lead to potential issues. 
-        # TODO: Do we check if all the samples have the same type/shape?
-        with self.db.begin() as txn, txn.cursor() as cursor:
-            self.keys = pkl.loads(cursor.get(b"__keys__"))
-            self.example = {f"arr_{i}": arr for i,arr in enumerate(\
-                pkl.loads(cursor.get(self.keys[0])))}
-
-    def __call__(self):
-        # Yield a dict with "arr_n" as the key and the ndarray as the value
-        with self.db.begin() as txn, txn.cursor() as cursor:
-            for key in self.keys:
-                example = pkl.loads(cursor.get(key))
-                yield {f"arr_{i}":arr for i,arr in enumerate(example)}
-
-    @property
-    def output_shapes(self):
-        """Defines the data shapes used to store the dataset.
-
-        Helps recover `np.ndarray`s types when loading into a `tf.data.Dataset` 
-        object using `from_generator()`.
-        """
-        return {key: arr.shape for key, arr in self.example.items()}
-
-    @property
-    def output_types(self):
-        """Defines the data types used to store the dataset. 
+    class LMDBDatasetGenerator(object):
+        """Generates dataset examples contained in a .mdb/.lmdb file. 
         
-        Helps recover `np.ndarray`s shapes when loading into a `tf.data.Dataset` 
-        object using `from_generator()`.
+        NOTE: We pass this object into `tf.data.Dataset.from_generator()` 
+        to load the `tf.data.Dataset` object.
         """
-        return {key: tf.float32 for key in self.example.keys()}
+
+        def __init__(self, path: str):
+            # Check whether directory or full filename is provided. If dir, 
+            # check for "data.mdb" file within dir.
+            isdir = os.path.isdir(path)
+            if isdir:
+                default_path = os.path.join(path, "data.mdb")
+                assert os.path.isfile(default_path), "LMDB default file {} " \
+                    "does not exist!".format(default_path)
+            else:
+                assert os.path.isfile(path), f"LMDB file {path} does not exist!"
+
+            self.db = lmdb.open(path, subdir=isdir, readonly=True, readahead=False)
+
+            # Retrive first sample to help recover proper types/shapes of ndarrays. 
+            # NOTE: We do not check if all the samples have the same type/shape
+            # since (a) we checked for it when saving the file and (b) it is more 
+            # efficient. However, if the file is modified in between saving and 
+            # loading (see https://w.wiki/GQE), this could lead to potential issues. 
+            # TODO: Do we check if all the samples have the same type/shape?
+            with self.db.begin() as txn, txn.cursor() as cursor:
+                self.keys = pkl.loads(cursor.get(b"__keys__"))
+                self.example = {f"arr_{i}": arr for i,arr in enumerate(\
+                    pkl.loads(cursor.get(self.keys[0])))}
+
+        def __call__(self):
+            # Yield a dict with "arr_n" as the key and the ndarray as the value
+            with self.db.begin() as txn, txn.cursor() as cursor:
+                for key in self.keys:
+                    example = pkl.loads(cursor.get(key))
+                    yield {f"arr_{i}":arr for i,arr in enumerate(example)}
+
+        @property
+        def output_shapes(self):
+            """Defines the data shapes used to store the dataset.
+
+            Helps recover `np.ndarray`s types when loading into a 
+            `tf.data.Dataset` object using `from_generator()`.
+            """
+            return {key: arr.shape for key, arr in self.example.items()}
+
+        @property
+        def output_types(self):
+            """Defines the data types used to store the dataset. 
+            
+            Helps recover `np.ndarray`s shapes when loading into a 
+            `tf.data.Dataset` object using `from_generator()`.
+            """
+            return {key: tf.float32 for key in self.example.keys()}
+
+    dsg = LMDBDatasetGenerator(path)
+    return tf.data.Dataset.from_generator(dsg, dsg.output_types, dsg.output_shapes)
 
 
-class TensorflowNumpyDataset(object):
+def TensorflowNumpyDataset(path: str) -> tf.data.Dataset:
     """Parse (generic) numpy dataset into a `tf.data.Dataset` object, 
     which contains `tf.Tensor`s.
 
-    NOTE: This actually returns a generator, which we pass into 
-    `tf.data.Dataset.from_generator()` to load the `tf.data.Datset` object.
-    
     Params:
     -------
     path: str
         Npz file which contains dataset.
+
+    Returns:
+    --------
+    dataset: tf.data.Dataset
+        Dataset loaded into its `tf.data.Dataset` form.
     """
-    
-    def __init__(self, path: str):
-        self.npzfile = np.load(path, allow_pickle=False)
-        self.keys = list(self.npzfile.keys())
-
-        # Retrive first sample to help recover proper types/shapes of ndarrays. 
-        # NOTE: We do not check if all the samples have the same type/shape
-        # since (a) we checked for it when saving the file and (b) it is more 
-        # efficient. However, if the file is modified in between saving and 
-        # loading (see https://w.wiki/GQE), this could lead to potential issues. 
-        # TODO: Do we check if all the samples have the same type/shape?
-        self.example = pkl.loads(self.npzfile.get(self.keys[0]))
-
-    def __call__(self):
-        # Yield a dict with "arr_n" as the key and the ndarray as the value
-        for key in self.keys:
-            yield pkl.loads(self.npzfile.get(key))
-
-    @property
-    def output_shapes(self):
-        """Defines the data shapes used to store the dataset. 
+    class NumpyDatasetGenerator(object):
+        """Generates dataset examples contained in a .npz file. 
         
-        Helps recover `np.ndarray`s types when loading into a `tf.data.Dataset` 
-        object using `from_generator()`.
+        NOTE: We pass this object into `tf.data.Dataset.from_generator()` 
+        to load the `tf.data.Dataset` object.
         """
-        return {key: np.array(arr).shape for key, arr in self.example.items()}
 
-    @property
-    def output_types(self):
-        """Defines the data types used to store the dataset. 
-        
-        Helps recover `np.ndarray`s shapes when loading into a `tf.data.Dataset` 
-        object using `from_generator()`.
-        """
-        return {key: tf.float32 for key in self.example.keys()}
+        def __init__(self, path: str):
+            self.npzfile = np.load(path, allow_pickle=False)
+            self.keys = list(self.npzfile.keys())
+
+            # Retrive first sample to help recover proper types/shapes of ndarrays. 
+            # NOTE: We do not check if all the samples have the same type/shape
+            # since (a) we checked for it when saving the file and (b) it is more 
+            # efficient. However, if the file is modified in between saving and 
+            # loading (see https://w.wiki/GQE), this could lead to potential issues. 
+            # TODO: Do we check if all the samples have the same type/shape?
+            self.example = pkl.loads(self.npzfile.get(self.keys[0]))
+
+        def __call__(self):
+            # Yield a dict with "arr_n" as the key and the ndarray as the value
+            for key in self.keys:
+                yield pkl.loads(self.npzfile.get(key))
+
+        @property
+        def output_shapes(self):
+            """Defines the data shapes used to store the dataset. 
+            
+            Helps recover `np.ndarray`s types when loading into a 
+            `tf.data.Dataset` object using `from_generator()`.
+            """
+            return {key: np.array(arr).shape for key, arr in self.example.items()}
+
+        @property
+        def output_types(self):
+            """Defines the data types used to store the dataset. 
+            
+            Helps recover `np.ndarray`s shapes when loading into a 
+            `tf.data.Dataset` object using `from_generator()`.
+            """
+            return {key: tf.float32 for key in self.example.keys()}
+
+    dsg = NumpyDatasetGenerator(path)
+    return tf.data.Dataset.from_generator(dsg, dsg.output_types, dsg.output_shapes)
 
 
 class TFRecordsDataset(object):
@@ -293,7 +326,7 @@ class TorchTFRecordsDataset(Dataset):
     https://discuss.pytorch.org/t/read-dataset-from-tfrecord-format/16409
 
     This seems promising, however requires using another pkg: 
-    https://github.com/vahidk/tfrecord
+    https://github.com/vahidk/tfrecord. Plus, we have to modify to work with np.ndarrays.
 
     Params:
     -------
@@ -384,13 +417,15 @@ if __name__ == "__main__":
         data = serializer.load(path=data_path, as_numpy=as_numpy)
         return data
 
-    dataset = load_dataset('transformer', 'primary', labels='Fitness', num_data=2, \
-        filetype='mdb', as_numpy=False)
-
-    print(isinstance(dataset, torch.utils.data.Dataset))
-    loader = DataLoader(dataset, batch_size=1)
-    for i_batch, sample_batched in enumerate(loader):
-        print(i_batch, [arr.shape for arr in sample_batched])
+    for ftype in ['h5', 'mdb', 'npz', 'tfrecords']:
+        dataset = load_dataset('transformer', 'primary', labels='Fitness', num_data=5, \
+            filetype=ftype, as_numpy=False)
+        print(dataset)
+    # print([arr.shape for arr in dataset])
+    # print(isinstance(dataset, torch.utils.data.Dataset))
+    # loader = DataLoader(dataset, batch_size=1)
+    # for i_batch, sample_batched in enumerate(loader):
+    #     print(i_batch, [arr.shape for arr in sample_batched])
     # # Transpose to make it channels_last
     # dataset = [arr.T for arr in dataset]
     # print([arr.shape for arr in dataset])
