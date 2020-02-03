@@ -104,7 +104,8 @@ class HDF5Serializer(InMemorySerializer):
                 raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
                     f"(axis={axis}): {shapes} - is the data format correct?")
 
-            for idx in range(num_examples[0]):  
+            n_examples = num_examples[0]
+            for idx in tqdm(range(n_examples), total=n_examples):
                 # NOTE: Since numpy cannot serialize lists of np.arrays together 
                 # for each individual example, we have to store them as a JSON 
                 # object. Each example, which is denoted by a key, contains a 
@@ -358,7 +359,8 @@ class NumpySerializer(InMemorySerializer):
                 f"(axis={axis}): {shapes} - is the data format correct?")
 
         dataset_dict = {}
-        for idx in range(num_examples[0]):
+        n_examples = num_examples[0]
+        for idx in tqdm(range(n_examples), total=n_examples):
             # NOTE: Since numpy cannot serialize lists of np.arrays together 
             # for each individual example, we have to store them as a dict 
             # object. Each example, which is denoted by a key, contains a 
