@@ -1,7 +1,8 @@
 import os
 import json
 
-from typing import List, Union
+from functools import partial
+from typing import Dict, List, Tuple, Union
 
 import h5py
 import lmdb
@@ -10,9 +11,7 @@ import pickle as pkl
 import tensorflow as tf
 
 import torch
-from torch.utils.data import Dataset
-
-from profit import backend as P
+from torch.utils.data import Dataset, IterableDataset
 
 
 def TensorflowHDF5Dataset(path: str) -> tf.data.Dataset:
@@ -209,7 +208,7 @@ def TensorflowNumpyDataset(path: str) -> tf.data.Dataset:
     return tf.data.Dataset.from_generator(dsg, dsg.output_types, dsg.output_shapes)
 
 
-class TFRecordsDataset(object):
+def TFRecordsDataset(path: str) -> tf.data.Dataset:
     """Parse (generic) TFRecords file into a `tf.data.Dataset` object, 
     which contains `tf.Tensor`s.
     
@@ -217,8 +216,59 @@ class TFRecordsDataset(object):
     -------
     path: str
         TFRecords file which contains dataset.
+
+    Returns:
+    --------
+    dataset: tf.data.Dataset
+        Dataset loaded into its `tf.data.Dataset` form.
     """
-    pass
+    def _deserialize(serialized: tf.Tensor, features: Dict[str, tf.io.FixedLenFeature], 
+                     **kwargs: Dict[str, List[int]]) -> Tuple[tf.Tensor, ...]:
+        """Deserialize an serialized example within the dataset.
+        
+        Params:
+        -------
+        serialized: tf.Tensor with dtype `string``
+            Tensor containing a batch of binary serialized tf.Example protos.
+        """
+        parsed_example = tf.io.parse_single_example(serialized=serialized, \
+            features=features)
+        tensors = {}
+        for name, tensor in parsed_example.items():
+            if name.startswith("arr"):
+                shape = kwargs.get("shape_{}".format(name.split("_")[-1]))
+                tensors[name] = tf.reshape(tf.decode_raw(tensor, tf.float32), shape)
+        return tensors
+    
+    # Determine what shapes each np.ndarray should be reshaped to. 
+    # Hack to allow saved flattened ndarray's to be reshaped properly. 
+    # NOTE: We could not properly convert each saved shape (which were 
+    # serialized as int64_lists and parsed as tf.Tensor) into lists so that 
+    # the ndarray's could be properly reshaped within _deserialize() above. 
+    serialized = next(tf.python_io.tf_record_iterator(path))
+    example = tf.train.Example()
+    example.ParseFromString(serialized)
+    shapes = {name: list(example.features.feature[name].int64_list.value) 
+              for name in example.features.feature.keys() if name.startswith("shape")}
+
+    # Define a dict with the data names and types we expect to find in 
+    # the TFRecords file. It is a quite cumbersome that this needs to be 
+    # specified again, because it could have been written in the header 
+    # of the TFRecords file instead.
+    features = {}
+    for name in example.features.feature.keys():
+        if name.startswith("arr"):
+            # NOTE: Assuming all arr_i's are saved as bytes_list
+            features[name] = tf.io.FixedLenFeature([], tf.string)
+        elif name.startswith("shape"):
+            # NOTE: Assuming arr shape_i's are saved as int64_lists 
+            features[name] = tf.io.FixedLenFeature([], tf.int64)
+        else:
+            raise TypeError("Unknown dtype for {}.".format(name))
+
+    # Parse serialized records into correctly shaped tensors/ndarray's
+    dataset = tf.data.TFRecordDataset(path)
+    return dataset.map(partial(_deserialize, features=features, **shapes))
 
 
 class TorchHDF5Dataset(Dataset):
@@ -318,15 +368,19 @@ class TorchNumpyDataset(Dataset):
         return sample[0] if len(sample) == 1 else sample
 
 
-class TorchTFRecordsDataset(Dataset):
-    """Parse (generic) tensorflow dataset into a `torch.utils.data.Dataset` 
+class TorchTFRecordsDataset(IterableDataset):
+    """Parse (generic) tensorflow dataset into a `torch.utils.data.IterableDataset` 
     object, which contains `torch.Tensor`s.
     
+    NOTE: This requires using tensorflow package, so the whole purpose 
+    of converting to a pytorch dataset is defeated, because we should 
+    be able to do it without in a sense! The TFRecord package, see
+    https://github.com/vahidk/tfrecord, solves this problem. However, it 
+    requires having another submodule...not ideal! It would potentially 
+    make it easier to read/write to tfrecords file. 
+
     Ideally, this should be done without need for using tensorflow. See: 
     https://discuss.pytorch.org/t/read-dataset-from-tfrecord-format/16409
-
-    This seems promising, however requires using another pkg: 
-    https://github.com/vahidk/tfrecord. Plus, we have to modify to work with np.ndarrays.
 
     Params:
     -------
@@ -337,19 +391,16 @@ class TorchTFRecordsDataset(Dataset):
     def __init__(self, path: str):
         pass
 
-    def __len__(self) -> int:
-        raise NotImplementedError
-
-    def __getitem__(self, idx: int) -> Union[torch.Tensor, List[torch.Tensor]]:
+    def __iter__(self) -> Union[torch.Tensor, List[torch.Tensor]]:
         raise NotImplementedError
 
 
 if __name__ == "__main__":
-    # from torch.utils.data import DataLoader
+    from torch.utils.data import DataLoader
     # torch_dataset = TorchHDF5Dataset("data/3gb1/processed/transformer_fitness/primary5.h5")
-    # torch_dataset = TorchLMDBDataset("data/3gb1/processed/transformer_fitness/primary.mdb")
+    # torch_dataset = TorchLMDBDataset("data/3gb1/processed/transformer_fitness/primary5.mdb")
     # torch_dataset = TorchNumpyDataset("data/3gb1/processed/transformer_fitness/primary5.npz")
-    # torch_dataset = TorchTFRecordsDataset("data/3gb1/processed/transformer_fitness/primary.tfrecords")
+    # torch_dataset = TorchTFRecordsDataset("data/3gb1/processed/transformer_fitness/primary5.tfrecords")
     # sample = torch_dataset[755]
     # for i in range(len(torch_dataset)): 
     #     sample = torch_dataset[i]
@@ -370,7 +421,7 @@ if __name__ == "__main__":
     from profit.dataset.preprocessors import preprocess_method_dict
     from profit.utils.data_utils import serialize_method_dict
     from profit.utils.data_utils.cacher import CacheNamePolicy
-
+    from profit import backend as P
 
     def load_dataset(method, mutator_fmt, labels, rootdir='data/3gb1/processed/', 
                     num_data=-1, filetype='h5', as_numpy=False) -> Union[np.ndarray, List[np.ndarray]]:
@@ -417,15 +468,21 @@ if __name__ == "__main__":
         data = serializer.load(path=data_path, as_numpy=as_numpy)
         return data
 
-    for ftype in ['h5', 'mdb', 'npz', 'tfrecords']:
+    # for ftype in ['h5', 'mdb', 'npz', 'tfrecords']:
+    for ftype in ['tfrecords']:
         dataset = load_dataset('transformer', 'primary', labels='Fitness', num_data=5, \
             filetype=ftype, as_numpy=False)
-        print(dataset)
-    # print([arr.shape for arr in dataset])
-    # print(isinstance(dataset, torch.utils.data.Dataset))
-    # loader = DataLoader(dataset, batch_size=1)
-    # for i_batch, sample_batched in enumerate(loader):
-    #     print(i_batch, [arr.shape for arr in sample_batched])
+        
+        # Print data shapes if torch datasets
+        if isinstance(dataset, torch.utils.data.Dataset):
+            loader = DataLoader(dataset, batch_size=2)
+            for i_batch, sample_batched in enumerate(loader):
+                print(i_batch, [arr.shape for arr in sample_batched])
+        elif isinstance(dataset, tf.data.Dataset):
+            print(dataset)
+        elif isinstance(dataset, (list, np.ndarray)):
+            print([arr.shape for arr in dataset])
+    
     # # Transpose to make it channels_last
     # dataset = [arr.T for arr in dataset]
     # print([arr.shape for arr in dataset])
@@ -433,11 +490,3 @@ if __name__ == "__main__":
     # P.set_data_format('channels_last')
     # serializer = serialize_method_dict.get('npz')
     # serializer.save(dataset, path="test.npz")
-
-    # torch_dataset = TorchNumpyDataset('test.npz')
-    # loader = DataLoader(torch_dataset, batch_size=2)
-    # for i_batch, sample_batched in enumerate(loader):
-    #     print(i_batch, [arr.shape for arr in sample_batched])
-    # for i in range(len(torch_dataset)): 
-    #     sample = torch_dataset[i]
-    #     print(i, [tensor.shape for tensor in sample])

@@ -3,8 +3,7 @@ import json
 import platform
 
 from abc import abstractmethod, ABC
-from functools import partial
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Union
 
 import h5py
 import lmdb
@@ -20,9 +19,11 @@ from profit import backend as P
 from profit.utils.data_utils.datasets import TensorflowHDF5Dataset
 from profit.utils.data_utils.datasets import TensorflowLMDBDataset
 from profit.utils.data_utils.datasets import TensorflowNumpyDataset
+from profit.utils.data_utils.datasets import TFRecordsDataset
 from profit.utils.data_utils.datasets import TorchHDF5Dataset
 from profit.utils.data_utils.datasets import TorchLMDBDataset
 from profit.utils.data_utils.datasets import TorchNumpyDataset
+from profit.utils.data_utils.datasets import TorchTFRecordsDataset
 
 
 class BaseSerializer(ABC):
@@ -180,8 +181,7 @@ class LMDBSerializer(LazySerializer):
         Params:
         -------
         data: np.ndarray or list of np.ndarray
-            The ndarray's to serialize. The first channel of each 
-            ndarray should contain the num of examples in the dataset.
+            The ndarray's to serialize.
 
         path: str
             Output LMDB directory or file.
@@ -438,8 +438,7 @@ class TFRecordsSerializer(LazySerializer):
         Params:
         -------
         data: np.ndarray or list of np.ndarray
-            The ndarray's to serialize. The first channel of each 
-            ndarray should contain the num of examples in the dataset.
+            The ndarray's to serialize.
 
         path: str
             Output TFRecords file.
@@ -486,34 +485,9 @@ class TFRecordsSerializer(LazySerializer):
 
         # Add shapes of each array in the dataset (for a single example). Hack 
         # to allow serialized data to be reshaped properly when loaded.
-        dataset = {"arr_{}".format(idx): arr for idx, arr in enumerate(data)}
-        dataset.update({"shape_{}".format(idx): np.array(arr.shape[1:]) 
-                        for idx, arr in enumerate(data)})
-
-        # Write serialized example(s) into the dataset
-        n_examples = data[0].shape[0]
-        with tf.io.TFRecordWriter(path) as writer:
-            for row in tqdm(range(n_examples), total=n_examples):
-                # NOTE: tobytes() flattens an ndarray. We have to flatten it 
-                # because tf _bytes_feature() only takes in bytes. To combat 
-                # this, we save each ndarray's shape as well (see above).
-                example = {}
-                for key, nparr in dataset.items():
-                    # Save metadata about the array (aka shape) as int64 feature
-                    if key.startswith("shape"):
-                        example[key] = {"data": nparr, "_type": _int64_feature}
-                    else:
-                        example[key] = {"data": nparr[row].tobytes(), 
-                                        "_type": _bytes_feature}
-                writer.write(_serialize(example))
-
-        # TODO: NEW ONE BELOW. Accounts for channels_first and channels_last!
-
-        # Add shapes of each array in the dataset (for a single example). Hack 
-        # to allow serialized data to be reshaped properly when loaded.
         shapes = {f"shape_{idx}": np.array(arr.shape[1:]) if P.data_format() == "channels_first" 
                   else np.array(arr.shape[:-1]) for idx, arr in enumerate(data)}
-        dataset = {"arr_{}".format(idx): arr for idx, arr in enumerate(data)}
+        dataset = {f"arr_{idx}": arr for idx, arr in enumerate(data)}
         dataset.update(shapes)
 
         # Write serialized example(s) into the dataset
@@ -524,20 +498,20 @@ class TFRecordsSerializer(LazySerializer):
                 # because tf _bytes_feature() only takes in bytes. To combat 
                 # this, we save each ndarray's shape as well (see above).
                 example = {}
-                for key, nparr in dataset.items():
+                for key, arr in dataset.items():
                     # Save metadata about the array (aka shape) as int64 feature
                     if key.startswith("shape"):
-                        example[key] = {"data": nparr, "_type": _int64_feature}
+                        example[key] = {"data": arr, "_type": _int64_feature}
                     else:
-                        example[key] = {"data": nparr[row].tobytes() if P.data_format() \
-                            == "channels_first" else nparr[...,row].tobytes(), 
+                        example[key] = {"data": arr[row].tobytes() if P.data_format() \
+                            == "channels_first" else arr[...,row].tobytes(), 
                                         "_type": _bytes_feature}
                 writer.write(_serialize(example))
 
 
     @staticmethod
     def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, \
-            List[np.ndarray], tf.data.TFRecordDataset]:
+            List[np.ndarray], TorchDataset, TensorflowDataset]:
         """Load the dataset.
 
         Assumes that each np.ndarray is saved under default names 
@@ -551,82 +525,40 @@ class TFRecordsSerializer(LazySerializer):
 
         as_numpy: bool, default=False
             If True, loads the dataset as a list of np.ndarray's (in 
-            its original form). If False, loads it as a TFRecordDataset.
+            its original form). If False, loads the dataset in  
+            P.backend()'s specified format.
 
         Returns:
         --------
-        data: np.ndarray or list of np.ndarray or tf.data.TFRecordDataset
-            The dataset (either in its original shape/format or as a 
-            TFRecordDataset).
+        data: np.ndarray, torch.utils.data.Dataset, or tf.data.Dataset
+            The dataset (either in its original shape/format or in 
+            P.backend()'s specified format).
         """
-        def _deserialize(serialized: tf.Tensor, features: Dict[str, tf.io.FixedLenFeature], 
-                         **kwargs: Dict[str, List[int]]) -> Tuple[tf.Tensor, ...]:
-            """Deserialize an serialized example within the dataset.
-            
-            Params:
-            -------
-            serialized: tf.Tensor with dtype `string``
-                Tensor containing a batch of binary serialized tf.Example protos.
-            """
-            parsed_example = tf.io.parse_single_example(serialized=serialized, \
-                features=features)
-            tensors = []
-            for name, tensor in parsed_example.items():
-                if name.startswith("arr"):
-                    shape = kwargs.get("shape_{}".format(name.split("_")[-1]))
-                    arr_i = tf.reshape(tf.decode_raw(tensor, tf.float32), shape)
-                    tensors.append(arr_i)
-            return tuple(tensors)
-            
-        # Determine what shapes each np.ndarray should be reshaped to. 
-        # Hack to allow saved flattened ndarray's to be reshaped properly. 
-        # NOTE: We could not properly convert each saved shape (which were 
-        # serialized as int64_lists and parsed as tf.Tensor) into lists so that 
-        # the ndarray's could be properly reshaped within _deserialize() above. 
-        serialized = next(tf.python_io.tf_record_iterator(path))
-        example = tf.train.Example()
-        example.ParseFromString(serialized)
-        shapes = {name: list(example.features.feature[name].int64_list.value) 
-                  for name in example.features.feature.keys() if name.startswith("shape")}
-
-        # Define a dict with the data names and types we expect to find in 
-        # the TFRecords file. It is a quite cumbersome that this needs to be 
-        # specified again, because it could have been written in the header 
-        # of the TFRecords file instead.
-        features = {}
-        for name in example.features.feature.keys():
-            if name.startswith("arr"):
-                # NOTE: Assuming all arr_i's are saved as bytes_list
-                features[name] = tf.io.FixedLenFeature([], tf.string)
-            elif name.startswith("shape"):
-                # NOTE: Assuming arr shape_i's are saved as int64_lists 
-                features[name] = tf.io.FixedLenFeature([], tf.int64)
-            else:
-                raise TypeError("Unknown dtype for {}.".format(name))
-
         # Parse serialized records into correctly shaped tensors/ndarray's
-        if not as_numpy:
-            dataset = tf.data.TFRecordDataset(path)
-            data = dataset.map(partial(_deserialize, features=features, **shapes))
-        else:
+        if as_numpy:
             dataset_dict = {}
             for serialized in tf.python_io.tf_record_iterator(path):
                 example = tf.train.Example()
                 example.ParseFromString(serialized)
+                # Save array shapes to ensure respective ndarrays get reshaped properly
+                shapes = {name: list(example.features.feature[name].int64_list.value) 
+                          for name in example.features.feature.keys() if name.startswith("shape")}
                 for name, tf_feature in example.features.feature.items():
                     if name.startswith("arr"):
                         parsed_data = np.frombuffer(tf_feature.bytes_list.value[0], np.float)
                         newshape = shapes.get("shape_{}".format(name.split("_")[-1]))
-                        reshaped = np.reshape(parsed_data, newshape=[1] + newshape)
+                        newshape = [1] + newshape if P.data_format() == \
+                            "channels_first" else newshape + [1]
+                        reshaped = np.reshape(parsed_data, newshape=newshape)
                         # Concatenate individual examples together into one ndarray.
-                        # NOTE: Value of shape[0] (aka first channel) denotes the total 
-                        # num of examples in the dataset.
                         if name not in dataset_dict.keys():
                             dataset_dict[name] = reshaped
                         else:
-                            dataset_dict[name] = np.vstack((dataset_dict.get(name), reshaped))
+                            dataset_dict[name] = np.vstack((dataset_dict.get(name), reshaped)) \
+                                if P.data_format() == "channels_first" \
+                                else np.hstack((dataset_dict.get(name), reshaped))
             # Extract np.ndarray's from dict and return in its original form
             data = [arr for arr in dataset_dict.values()]
-            if len(data) == 1:
-                data = data[0]
-        return data
+            return data[0] if len(data) == 1 else data
+        return TorchTFRecordsDataset(path) if P.backend() == "pytorch" \
+            else TFRecordsDataset(path)
