@@ -443,19 +443,19 @@ class TFRecordsSerializer(LazySerializer):
         path: str
             Output TFRecords file.
         """
-        def _bytes_feature(value: Union[str, bytes]):
+        def _bytes_feature(value: Union[str, bytes]) -> tf.train.Feature:
             """Returns a bytes_list from a string / byte."""
             if isinstance(value, type(tf.constant(0))):
                 value = value.numpy() # BytesList won't unpack string from an EagerTensor.
             return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
-        def _float_feature(value: float):
+        def _float_feature(value: float) -> tf.train.Feature:
             """Returns a float_list from a float / double."""
             if not isinstance(value, (list, np.ndarray)):
                 value = [value] # FloatList won't unpack unless it is an list/np.array.
             return tf.train.Feature(float_list=tf.train.FloatList(value=value))
 
-        def _int64_feature(value: Union[bool, int]):
+        def _int64_feature(value: Union[bool, int]) -> tf.train.Feature:
             """Returns an int64_list from a bool / enum / int / uint."""
             if not isinstance(value, (list, np.ndarray)):
                 value = [value] # Int64List won't unpack, unless it is an list/np.array.
@@ -474,8 +474,6 @@ class TFRecordsSerializer(LazySerializer):
             data = [data]
 
         # Check for same num of examples in the multiple ndarray's
-        # TODO: Make tensorflow support different data formats, currently only 
-        # supports channels_first. NOTE: Will break if using channels_last!
         shapes = [arr.shape for arr in data]
         axis = 0 if P.data_format() == "channels_first" else -1
         num_examples = [shape[axis] for shape in shapes]
