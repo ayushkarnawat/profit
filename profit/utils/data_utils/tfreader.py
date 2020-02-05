@@ -1,6 +1,7 @@
 import io
 import os
 import struct
+import warnings
 
 from typing import Dict, Iterable, Optional, Tuple
 
@@ -62,6 +63,10 @@ def tfrecord_iterator(data_path: str, index_path: Optional[str]=None,
             yield datum_bytes_view
 
     if index_path is None:
+        warnings.warn(f"Could not find index associated with '{data_path}' - " + 
+            "data sharding will be unavailable! \033[93mNOTE\033[0m: Using " + 
+            "num_workers > 1 in `torch.utils.data.DataLoader()` might yield " + 
+            "duplicate data!")
         yield from read_records()
     else:
         index = np.loadtxt(index_path, dtype=np.int64)[:,0]

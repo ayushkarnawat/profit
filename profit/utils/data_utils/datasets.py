@@ -1,6 +1,5 @@
 import os
 import json
-import warnings
 
 from functools import partial
 from typing import Dict, List, Tuple, Union
@@ -393,11 +392,7 @@ class TorchTFRecordsDataset(IterableDataset):
 
     def __init__(self, path: str):
         self.tfrecord_path = path
-        self.index_path = f"{path}_idx" if os.path.exists(f"{path}_idx") else None
-        if self.index_path is None:
-            warnings.warn("Could not find index path - data sharding will be " +
-                "unavailable! \033[93mNOTE\033[0m: Using num_workers > 1 in " + 
-                "`torch.utils.data.DataLoader()` might yield duplicate data!")
+        self.index_path = f"{path}_idx" if os.path.exists(f"{path}_idx") else None            
 
     def __iter__(self) -> Union[torch.Tensor, List[torch.Tensor]]:
         # Shard/Chunk dataset if multiple workers are iterating over dataset
