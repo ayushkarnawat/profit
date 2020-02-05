@@ -14,7 +14,7 @@ import tensorflow as tf
 import torch
 from torch.utils.data import Dataset, IterableDataset
 
-from tfreader import tfrecord_iterator, tfrecord_loader
+from tfreader import tfrecord_loader
 
 
 def TensorflowHDF5Dataset(path: str) -> tf.data.Dataset:
@@ -398,15 +398,6 @@ class TorchTFRecordsDataset(IterableDataset):
             warnings.warn("Could not find index path - data sharding will be " +
                 "unavailable! \033[93mNOTE\033[0m: Using num_workers > 1 in " + 
                 "`torch.utils.data.DataLoader()` might yield duplicate data!")
-        
-        # Retrieve the keys and their data types from the first example to help 
-        # recover proper shapes of the ndarrays. 
-        serialized = next(tfrecord_iterator(self.tfrecord_path))
-        example = tf.train.Example()
-        example.ParseFromString(serialized)
-        feature_keys = list(example.features.feature.keys())
-        self.description = {key: "int" if key.startswith("shape") else "byte" 
-                            for key in feature_keys}
 
     def __iter__(self) -> Union[torch.Tensor, List[torch.Tensor]]:
         # Shard/Chunk dataset if multiple workers are iterating over dataset
@@ -418,7 +409,7 @@ class TorchTFRecordsDataset(IterableDataset):
             shard = None
 
         # Reshape example into correctly shaped tensors/ndarray's
-        records = tfrecord_loader(self.tfrecord_path, self.index_path, self.description, shard)
+        records = tfrecord_loader(self.tfrecord_path, self.index_path, shard)
         for record in records:
             sample = []
             for key, value in record.items():

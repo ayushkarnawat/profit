@@ -81,7 +81,6 @@ def tfrecord_iterator(data_path: str, index_path: Optional[str]=None,
 
 
 def tfrecord_loader(data_path: str, index_path: Optional[str], 
-                    description: Dict[str, str], 
                     shard: Optional[Tuple[int, int]]=None) \
                     -> Iterable[Dict[str, np.ndarray]]:
     """Create an iterator over the (decoded) examples contained within 
@@ -97,11 +96,6 @@ def tfrecord_loader(data_path: str, index_path: Optional[str],
     
     index_path: str, optional, default=None
         Index file path. Can be set to None if no file is available.
-    
-    description: dict of {str, str}
-        Dict of key, value pairs where the keys are the name of the 
-        features and values correspond to the data type. The data type 
-        can be "byte", "float" or "int".
 
     shard: tuple of ints, optional, default=None
         A tuple (index, count) representing worker_id and num_workers 
@@ -121,21 +115,18 @@ def tfrecord_loader(data_path: str, index_path: Optional[str],
         example.ParseFromString(record)
 
         features = {}
-        for key, typename in description.items():
-            tf_typename = {
-                "byte": "bytes_list",
-                "float": "float_list",
-                "int": "int64_list"
-            }[typename]
-            if key not in example.features.feature:
-                raise ValueError("Key {} doesn't exist.".format(key))
-            value = getattr(example.features.feature[key], tf_typename).value
-            if typename == "byte":
+        for key in list(example.features.feature.keys()):
+            # NOTE: We assume that each key in the example has only one field 
+            # (either "bytes_list", "float_list", or "int64_list")!
+            field = example.features.feature[key].ListFields()[0]
+            tf_typename, value = field[0].name, field[1].value
+
+            # Decode raw bytes into respective data types
+            if tf_typename == "bytes_list":
                 value = np.frombuffer(value[0])
-            elif typename == "float":
+            elif tf_typename == "float_list":
                 value = np.array(value, dtype=np.float32)
-            elif typename == "int":
+            elif tf_typename == "int64_list":
                 value = np.array(value, dtype=np.int32)
             features[key] = value
-
         yield features
