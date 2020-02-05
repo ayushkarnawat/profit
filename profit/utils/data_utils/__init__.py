@@ -2,6 +2,7 @@ from profit.utils.data_utils import cacher
 from profit.utils.data_utils import cast
 from profit.utils.data_utils import datasets
 from profit.utils.data_utils import serializers
+from profit.utils.data_utils import tfreader
 from profit.utils.data_utils import tokenizers
 from profit.utils.data_utils import vocabs
 
@@ -22,6 +23,9 @@ from profit.utils.data_utils.serializers import HDF5Serializer
 from profit.utils.data_utils.serializers import LMDBSerializer
 from profit.utils.data_utils.serializers import NumpySerializer
 from profit.utils.data_utils.serializers import TFRecordsSerializer
+
+from profit.utils.data_utils.tfreader import tfrecord_iterator
+from profit.utils.data_utils.tfreader import tfrecord_loader
 
 from profit.utils.data_utils.tokenizers import BaseTokenizer
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer

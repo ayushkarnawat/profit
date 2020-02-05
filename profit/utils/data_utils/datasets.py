@@ -13,6 +13,8 @@ import tensorflow as tf
 import torch
 from torch.utils.data import Dataset, IterableDataset
 
+from tfreader import tfrecord_iterator, tfrecord_loader
+
 
 def TensorflowHDF5Dataset(path: str) -> tf.data.Dataset:
     """Parse (generic) HDF5 dataset into a `tf.data.Dataset` object, 
@@ -372,15 +374,15 @@ class TorchTFRecordsDataset(IterableDataset):
     """Parse (generic) tensorflow dataset into a `torch.utils.data.IterableDataset` 
     object, which contains `torch.Tensor`s.
     
-    NOTE: This requires using tensorflow package, so the whole purpose 
-    of converting to a pytorch dataset is defeated, because we should 
-    be able to do it without in a sense! The TFRecord package, see
-    https://github.com/vahidk/tfrecord, solves this problem. However, it 
-    requires having another submodule...not ideal! It would potentially 
-    make it easier to read/write to tfrecords file. 
+    NOTE: This requires using tensorflow (via `tfrecord_loader()`). As 
+    such, the whole purpose of loading data from a tfrecords file to 
+    `torch.Tensor`s is defeated as we should be able to do without 
+    using the tf package. 
 
-    Ideally, this should be done without need for using tensorflow. See: 
-    https://discuss.pytorch.org/t/read-dataset-from-tfrecord-format/16409
+    As shown in https://github.com/vahidk/tfrecord, we don't have to 
+    use `tf.train.Example()` to parse through examples. Rather, we can 
+    use `example_pb2.py` provided in the link above to parse an example 
+    by replacing `tf.train.Example()` -> `example_pb2.Example()`.  
 
     Params:
     -------
@@ -389,10 +391,39 @@ class TorchTFRecordsDataset(IterableDataset):
     """
 
     def __init__(self, path: str):
-        pass
+        self.tfrecord_path = path
+        self.index_path = f"{path}_idx" if os.path.exists(f"{path}_idx") else None
+
+        # Retrieve the keys and their data types from the first example to help 
+        # recover proper shapes of the ndarrays. 
+        serialized = next(tfrecord_iterator(self.tfrecord_path))
+        example = tf.train.Example()
+        example.ParseFromString(serialized)
+        feature_keys = list(example.features.feature.keys())
+        self.description = {key: "int" if key.startswith("shape") else "byte" 
+                            for key in feature_keys}
+
+        if self.index_path == None:
+            print('Could not find index path - sharding and num-workers will be unavailable!')
 
     def __iter__(self) -> Union[torch.Tensor, List[torch.Tensor]]:
-        raise NotImplementedError
+        # Shard dataset if many workers are iterating over dataset
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is not None:
+            shard = worker_info.id, worker_info.num_workers
+            np.random.seed(worker_info.seed % np.iinfo(np.uint32).max)
+        else:
+            shard = None
+
+        # Reshape example into correctly shaped tensors/ndarray's
+        it = tfrecord_loader(self.tfrecord_path, self.index_path, self.description, shard)
+        for record in it:
+            sample = []
+            for key, value in record.items():
+                if key.startswith("arr"):
+                    shape = record.get("shape_{}".format(key.split("_")[-1]))
+                    sample.append(np.reshape(value, newshape=shape))
+            yield sample[0] if len(sample) == 1 else sample
 
 
 if __name__ == "__main__":
@@ -468,8 +499,7 @@ if __name__ == "__main__":
         data = serializer.load(path=data_path, as_numpy=as_numpy)
         return data
 
-    # for ftype in ['h5', 'mdb', 'npz', 'tfrecords']:
-    for ftype in ['tfrecords']:
+    for ftype in ['h5', 'mdb', 'npz', 'tfrecords']:
         dataset = load_dataset('transformer', 'primary', labels='Fitness', num_data=5, \
             filetype=ftype, as_numpy=False)
         

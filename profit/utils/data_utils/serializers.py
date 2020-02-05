@@ -1,5 +1,6 @@
 import os
 import json
+import struct
 import platform
 
 from abc import abstractmethod, ABC
@@ -424,7 +425,8 @@ class TFRecordsSerializer(LazySerializer):
     """
 
     @staticmethod
-    def save(data: Union[np.ndarray, List[np.ndarray]], path: str) -> None:
+    def save(data: Union[np.ndarray, List[np.ndarray]], path: str, 
+             save_index: bool=True) -> None:
         """Save data to .tfrecords file.
         
         Saves each np.ndarray under default names `arr_0`, ..., `arr_n` 
@@ -442,6 +444,10 @@ class TFRecordsSerializer(LazySerializer):
 
         path: str
             Output TFRecords file.
+
+        save_index: bool, default=True
+            If True, saves an index of records. If False, no index is 
+            created.
         """
         def _bytes_feature(value: Union[str, bytes]) -> tf.train.Feature:
             """Returns a bytes_list from a string / byte."""
@@ -469,6 +475,36 @@ class TFRecordsSerializer(LazySerializer):
                 features = tf.train.Features(feature=dset_item)
                 example_proto = tf.train.Example(features=features)
             return example_proto.SerializeToString()
+
+        def _create_idx(tfrecord_file: path, index_file: path) -> None:
+            """Create index of TFRecords file. 
+            
+            The rows (contained within the file) indicates the num of 
+            examples in the dataset. The last column indicates how many 
+            bytes of storage each example takes. 
+            
+            Taken from https://git.io/JvGMw.
+            """
+            infile = open(tfrecord_file, "rb")
+            outfile = open(index_file, "w")
+
+            while True:
+                current = infile.tell()
+                try:
+                    byte_len = infile.read(8)
+                    if len(byte_len) == 0:
+                        break
+                    infile.read(4)
+                    proto_len = struct.unpack("q", byte_len)[0]
+                    infile.read(proto_len)
+                    infile.read(4)
+                    outfile.write(str(current) + " " + str(infile.tell() - current) + "\n")
+                except:
+                    print("Failed to parse TFRecord.")
+                    break
+
+            infile.close()
+            outfile.close()
 
         if isinstance(data, np.ndarray):
             data = [data]
@@ -505,6 +541,13 @@ class TFRecordsSerializer(LazySerializer):
                             == "channels_first" else arr[...,row].tobytes(), 
                                         "_type": _bytes_feature}
                 writer.write(_serialize(example))
+
+        # Write index of the examples
+        # NOTE: It's recommended to create an index file for each TFRecord file. 
+        # Index file must be provided when using multiple workers, otherwise the 
+        # loader may return duplicate records.
+        if save_index:
+            _create_idx(tfrecord_file=path, index_file=f"{path}_idx")
 
 
     @staticmethod
