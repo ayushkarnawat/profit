@@ -1,5 +1,6 @@
 import os
 import json
+import warnings
 
 from functools import partial
 from typing import Dict, List, Tuple, Union
@@ -393,7 +394,11 @@ class TorchTFRecordsDataset(IterableDataset):
     def __init__(self, path: str):
         self.tfrecord_path = path
         self.index_path = f"{path}_idx" if os.path.exists(f"{path}_idx") else None
-
+        if self.index_path is None:
+            warnings.warn("Could not find index path - data sharding will be " +
+                "unavailable! \033[93mNOTE\033[0m: Using num_workers > 1 in " + 
+                "`torch.utils.data.DataLoader()` might yield duplicate data!")
+        
         # Retrieve the keys and their data types from the first example to help 
         # recover proper shapes of the ndarrays. 
         serialized = next(tfrecord_iterator(self.tfrecord_path))
@@ -403,11 +408,8 @@ class TorchTFRecordsDataset(IterableDataset):
         self.description = {key: "int" if key.startswith("shape") else "byte" 
                             for key in feature_keys}
 
-        if self.index_path == None:
-            print('Could not find index path - sharding and num-workers will be unavailable!')
-
     def __iter__(self) -> Union[torch.Tensor, List[torch.Tensor]]:
-        # Shard dataset if many workers are iterating over dataset
+        # Shard/Chunk dataset if multiple workers are iterating over dataset
         worker_info = torch.utils.data.get_worker_info()
         if worker_info is not None:
             shard = worker_info.id, worker_info.num_workers
@@ -416,8 +418,8 @@ class TorchTFRecordsDataset(IterableDataset):
             shard = None
 
         # Reshape example into correctly shaped tensors/ndarray's
-        it = tfrecord_loader(self.tfrecord_path, self.index_path, self.description, shard)
-        for record in it:
+        records = tfrecord_loader(self.tfrecord_path, self.index_path, self.description, shard)
+        for record in records:
             sample = []
             for key, value in record.items():
                 if key.startswith("arr"):

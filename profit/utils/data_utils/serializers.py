@@ -545,7 +545,7 @@ class TFRecordsSerializer(LazySerializer):
         # Write index of the examples
         # NOTE: It's recommended to create an index file for each TFRecord file. 
         # Index file must be provided when using multiple workers, otherwise the 
-        # loader may return duplicate records.
+        # loader may return duplicate records if using multiple workers.
         if save_index:
             _create_idx(tfrecord_file=path, index_file=f"{path}_idx")
 
