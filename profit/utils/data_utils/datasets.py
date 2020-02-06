@@ -13,7 +13,7 @@ import tensorflow as tf
 import torch
 from torch.utils.data import Dataset, IterableDataset
 
-from tfreader import tfrecord_loader
+from profit.utils.data_utils.tfreader import tfrecord_loader
 
 
 def TensorflowHDF5Dataset(path: str) -> tf.data.Dataset:
