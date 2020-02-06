@@ -118,15 +118,13 @@ def TensorflowLMDBDataset(path: str) -> tf.data.Dataset:
             # TODO: Do we check if all the samples have the same type/shape?
             with self.db.begin() as txn, txn.cursor() as cursor:
                 self.keys = pkl.loads(cursor.get(b"__keys__"))
-                self.example = {f"arr_{i}": arr for i,arr in enumerate(\
-                    pkl.loads(cursor.get(self.keys[0])))}
+                self.example = pkl.loads(cursor.get(self.keys[0]))
 
         def __call__(self):
             # Yield a dict with "arr_n" as the key and the ndarray as the value
             with self.db.begin() as txn, txn.cursor() as cursor:
                 for key in self.keys:
-                    example = pkl.loads(cursor.get(key))
-                    yield {f"arr_{i}":arr for i,arr in enumerate(example)}
+                    yield pkl.loads(cursor.get(key))
 
         @property
         def output_shapes(self):
@@ -135,7 +133,7 @@ def TensorflowLMDBDataset(path: str) -> tf.data.Dataset:
             Helps recover `np.ndarray`s types when loading into a 
             `tf.data.Dataset` object using `from_generator()`.
             """
-            return {key: arr.shape for key, arr in self.example.items()}
+            return {key: np.array(arr).shape for key, arr in self.example.items()}
 
         @property
         def output_types(self):
@@ -339,7 +337,7 @@ class TorchLMDBDataset(Dataset):
         
         with self.db.begin() as txn, txn.cursor() as cursor:
             ex = pkl.loads(cursor.get(self.keys[idx]))
-            sample = [torch.from_numpy(arr) for arr in ex]
+            sample = [torch.FloatTensor(arr) for arr in ex.values()]
         return sample[0] if len(sample) == 1 else sample
 
 

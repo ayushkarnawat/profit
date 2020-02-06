@@ -239,8 +239,8 @@ class LMDBSerializer(LazySerializer):
         n_examples = num_examples[0]
         txn = db.begin(write=True)
         for idx in tqdm(range(n_examples), total=n_examples):
-            example = [arr[idx] if P.data_format() == "channels_first" 
-                       else arr[...,idx] for arr in data]
+            example = {f"arr_{i}":arr[idx].tolist() if P.data_format() == "channels_first" 
+                       else arr[...,idx].tolist() for i,arr in enumerate(data)}
             txn = put_or_grow(txn, key=u'{:08}'.format(idx).encode('ascii'), 
                               value=pkl.dumps(example, protocol=-1))
             # NOTE: If we do not commit some examples before the db grows, 
@@ -296,11 +296,10 @@ class LMDBSerializer(LazySerializer):
             db = lmdb.open(path, subdir=isdir, readonly=True)
             dataset_dict = {}
             with db.begin() as txn, txn.cursor() as cursor:
-                keys = pkl.loads(cursor.get(b"__keys__"))
-                for key in keys:
+                for key in pkl.loads(cursor.get(b"__keys__")):
                     example = pkl.loads(cursor.get(key))
-                    for idx, arr in enumerate(example):
-                        name = "arr_{}".format(idx)
+                    for name, arr in example.items():
+                        arr = np.array(arr)
                         newshape = [1] + list(arr.shape) if P.data_format() == \
                             "channels_first" else list(arr.shape) + [1]
                         reshaped = np.reshape(arr, newshape=newshape)
@@ -360,8 +359,8 @@ class NumpySerializer(InMemorySerializer):
             # for each individual example, we have to store them as a dict 
             # object. Each example, which is denoted by a key, contains a 
             # dict with the key names being "arr_0", ..., "arr_n" based on 
-            # which array it is referencing. Additionally, each ndarray has 
-            # to be converted to lists of lists for proper storage.
+            # which array it is referencing. Additionally, each ndarray is  
+            # converted to lists of lists to save storage space.
             example = {f"arr_{i}": arr[idx].tolist() if P.data_format() == \
                 "channels_first" else arr[...,idx].tolist() for i,arr in enumerate(data)}
             key = u'{:08}'.format(idx)
