@@ -293,9 +293,8 @@ class TorchHDF5Dataset(Dataset):
 
     def __getitem__(self, idx: int) -> Union[torch.Tensor, List[torch.Tensor]]:
         # Convert to pytorch tensors
-        sample_dict = json.loads(self.h5file.get(self.keys[idx])[()])
-        sample = [torch.FloatTensor(arr) for arr in sample_dict.values()]
-        return sample[0] if len(sample) == 1 else sample
+        example = json.loads(self.h5file.get(self.keys[idx])[()])
+        return {key: torch.FloatTensor(arr) for key,arr in example.items()}
 
 
 class TorchLMDBDataset(Dataset):
@@ -336,9 +335,8 @@ class TorchLMDBDataset(Dataset):
             raise IndexError(f"Index ({idx}) out of range (0-{self.num_examples})")
         
         with self.db.begin() as txn, txn.cursor() as cursor:
-            ex = pkl.loads(cursor.get(self.keys[idx]))
-            sample = [torch.FloatTensor(arr) for arr in ex.values()]
-        return sample[0] if len(sample) == 1 else sample
+            example = pkl.loads(cursor.get(self.keys[idx]))
+            return {key: torch.FloatTensor(arr) for key,arr in example.items()}
 
 
 class TorchNumpyDataset(Dataset):
@@ -363,9 +361,8 @@ class TorchNumpyDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Union[torch.Tensor, List[torch.Tensor]]:
         # Convert to pytorch tensors
-        sample_dict = pkl.loads(self.npzfile.get(self.keys[idx]))
-        sample = [torch.FloatTensor(arr) for arr in sample_dict.values()]
-        return sample[0] if len(sample) == 1 else sample
+        example = pkl.loads(self.npzfile.get(self.keys[idx]))
+        return {key: torch.FloatTensor(arr) for key,arr in example.items()}
 
 
 class TorchTFRecordsDataset(IterableDataset):
@@ -404,12 +401,12 @@ class TorchTFRecordsDataset(IterableDataset):
         # Reshape example into correctly shaped tensors/ndarray's
         records = tfrecord_loader(self.tfrecord_path, self.index_path, shard)
         for record in records:
-            sample = []
+            example = {}
             for key, value in record.items():
                 if key.startswith("arr"):
                     shape = record.get("shape_{}".format(key.split("_")[-1]))
-                    sample.append(np.reshape(value, newshape=shape))
-            yield sample[0] if len(sample) == 1 else sample
+                    example[key] = np.reshape(value, newshape=shape)
+            yield example
 
 
 if __name__ == "__main__":
@@ -486,23 +483,27 @@ if __name__ == "__main__":
         return data
 
     for ftype in ['h5', 'mdb', 'npz', 'tfrecords']:
+        P.set_data_format('channels_first')
         dataset = load_dataset('transformer', 'primary', labels='Fitness', num_data=5, \
             filetype=ftype, as_numpy=False)
         
-        # Print data shapes if torch datasets
+        # # Transpose to make it channels_last
+        # dataset = [arr.T for arr in dataset]
+
+        # # Save the results
+        # P.set_data_format('channels_last')
+        # serializer = serialize_method_dict.get(ftype)
+        # serializer.save(dataset, path=f"test.{ftype}")
+
+        # # Load and compare
+        # dataset = serializer.load(path=f"test.{ftype}", as_numpy=False)
+
+        # Print data shapes based on type
         if isinstance(dataset, torch.utils.data.Dataset):
             loader = DataLoader(dataset, batch_size=2)
             for i_batch, sample_batched in enumerate(loader):
-                print(i_batch, [arr.shape for arr in sample_batched])
+                print(i_batch, [arr.shape for arr in sample_batched.values()])
         elif isinstance(dataset, tf.data.Dataset):
             print(dataset)
         elif isinstance(dataset, (list, np.ndarray)):
             print([arr.shape for arr in dataset])
-    
-    # # Transpose to make it channels_last
-    # dataset = [arr.T for arr in dataset]
-    # print([arr.shape for arr in dataset])
-
-    # P.set_data_format('channels_last')
-    # serializer = serialize_method_dict.get('npz')
-    # serializer.save(dataset, path="test.npz")
