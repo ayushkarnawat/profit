@@ -364,7 +364,7 @@ class NumpySerializer(InMemorySerializer):
             example = {f"arr_{i}": arr[idx].tolist() if P.data_format() == \
                 "channels_first" else arr[...,idx].tolist() for i,arr in enumerate(data)}
             key = u'{:08}'.format(idx)
-            dataset_dict[key] = pkl.dumps(example)
+            dataset_dict[key] = pkl.dumps(example, protocol=-1)
 
         # Save each example (denoted by key) seperately
         np.savez_compressed(path, **dataset_dict) if compress \
