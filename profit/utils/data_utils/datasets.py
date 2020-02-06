@@ -49,13 +49,13 @@ def TensorflowHDF5Dataset(path: str) -> tf.data.Dataset:
             # TODO: Do we check if all the samples have the same type/shape?
             self.example = json.loads(self.h5file.get(self.keys[0])[()])
 
-        def __call__(self):
+        def __call__(self) -> Dict[str, np.ndarray]:
             # Yield a dict with "arr_n" as the key and the ndarray as the value
             for key in self.keys:
                 yield json.loads(self.h5file.get(key)[()])
 
         @property
-        def output_shapes(self):
+        def output_shapes(self) -> Dict[str, Tuple[int, ...]]:
             """Defines the data shapes used to store the dataset. 
             
             Helps recover `np.ndarray`s types when loading into a 
@@ -64,7 +64,7 @@ def TensorflowHDF5Dataset(path: str) -> tf.data.Dataset:
             return {key: np.array(arr).shape for key, arr in self.example.items()}
 
         @property
-        def output_types(self):
+        def output_types(self) -> Dict[str, type]:
             """Defines the data types used to store the dataset. 
             
             Helps recover `np.ndarray`s shapes when loading into a 
@@ -120,14 +120,14 @@ def TensorflowLMDBDataset(path: str) -> tf.data.Dataset:
                 self.keys = pkl.loads(cursor.get(b"__keys__"))
                 self.example = pkl.loads(cursor.get(self.keys[0]))
 
-        def __call__(self):
+        def __call__(self) -> Dict[str, np.ndarray]:
             # Yield a dict with "arr_n" as the key and the ndarray as the value
             with self.db.begin() as txn, txn.cursor() as cursor:
                 for key in self.keys:
                     yield pkl.loads(cursor.get(key))
 
         @property
-        def output_shapes(self):
+        def output_shapes(self) -> Dict[str, Tuple[int, ...]]:
             """Defines the data shapes used to store the dataset.
 
             Helps recover `np.ndarray`s types when loading into a 
@@ -136,7 +136,7 @@ def TensorflowLMDBDataset(path: str) -> tf.data.Dataset:
             return {key: np.array(arr).shape for key, arr in self.example.items()}
 
         @property
-        def output_types(self):
+        def output_types(self) -> Dict[str, type]:
             """Defines the data types used to store the dataset. 
             
             Helps recover `np.ndarray`s shapes when loading into a 
@@ -181,13 +181,13 @@ def TensorflowNumpyDataset(path: str) -> tf.data.Dataset:
             # TODO: Do we check if all the samples have the same type/shape?
             self.example = pkl.loads(self.npzfile.get(self.keys[0]))
 
-        def __call__(self):
+        def __call__(self) -> Dict[str, np.ndarray]:
             # Yield a dict with "arr_n" as the key and the ndarray as the value
             for key in self.keys:
                 yield pkl.loads(self.npzfile.get(key))
 
         @property
-        def output_shapes(self):
+        def output_shapes(self) -> Dict[str, Tuple[int, ...]]:
             """Defines the data shapes used to store the dataset. 
             
             Helps recover `np.ndarray`s types when loading into a 
@@ -196,7 +196,7 @@ def TensorflowNumpyDataset(path: str) -> tf.data.Dataset:
             return {key: np.array(arr).shape for key, arr in self.example.items()}
 
         @property
-        def output_types(self):
+        def output_types(self) -> Dict[str, type]:
             """Defines the data types used to store the dataset. 
             
             Helps recover `np.ndarray`s shapes when loading into a 
@@ -223,7 +223,7 @@ def TFRecordsDataset(path: str) -> tf.data.Dataset:
         Dataset loaded into its `tf.data.Dataset` form.
     """
     def _deserialize(serialized: tf.Tensor, features: Dict[str, tf.io.FixedLenFeature], 
-                     **kwargs: Dict[str, List[int]]) -> Tuple[tf.Tensor, ...]:
+                     **kwargs: Dict[str, List[int]]) -> Dict[str, Tuple[tf.Tensor, ...]]:
         """Deserialize an serialized example within the dataset.
         
         Params:
@@ -291,7 +291,7 @@ class TorchHDF5Dataset(Dataset):
     def __len__(self) -> int:
         return len(self.keys)
 
-    def __getitem__(self, idx: int) -> Union[torch.Tensor, List[torch.Tensor]]:
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         # Convert to pytorch tensors
         example = json.loads(self.h5file.get(self.keys[idx])[()])
         return {key: torch.FloatTensor(arr) for key,arr in example.items()}
@@ -329,7 +329,7 @@ class TorchLMDBDataset(Dataset):
     def __len__(self) -> int:
         return self.num_examples
 
-    def __getitem__(self, idx: int) -> Union[torch.Tensor, List[torch.Tensor]]:
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         # Check for invalid indexing
         if idx > self.num_examples:
             raise IndexError(f"Index ({idx}) out of range (0-{self.num_examples})")
@@ -359,7 +359,7 @@ class TorchNumpyDataset(Dataset):
     def __len__(self) -> int:
         return len(self.keys)
 
-    def __getitem__(self, idx: int) -> Union[torch.Tensor, List[torch.Tensor]]:
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         # Convert to pytorch tensors
         example = pkl.loads(self.npzfile.get(self.keys[idx]))
         return {key: torch.FloatTensor(arr) for key,arr in example.items()}
@@ -389,7 +389,7 @@ class TorchTFRecordsDataset(IterableDataset):
         self.tfrecord_path = path
         self.index_path = f"{path}_idx" if os.path.exists(f"{path}_idx") else None            
 
-    def __iter__(self) -> Union[torch.Tensor, List[torch.Tensor]]:
+    def __iter__(self) -> Dict[str, torch.Tensor]:
         # Shard/Chunk dataset if multiple workers are iterating over dataset
         worker_info = torch.utils.data.get_worker_info()
         if worker_info is not None:
