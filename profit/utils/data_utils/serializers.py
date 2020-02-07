@@ -146,6 +146,7 @@ class HDF5Serializer(InMemorySerializer):
         """
         if as_numpy:
             dataset_dict = {}
+            axis = 0 if P.data_format() == "channels_first" else -1
             with h5py.File(path, "r") as h5file:
                 for key in list(h5file.keys()):
                     example = json.loads(h5file.get(key)[()])
@@ -158,9 +159,8 @@ class HDF5Serializer(InMemorySerializer):
                         if name not in dataset_dict.keys():
                             dataset_dict[name] = reshaped
                         else:
-                            dataset_dict[name] = np.vstack((dataset_dict.get(name), reshaped)) \
-                                if P.data_format() == "channels_first" \
-                                else np.hstack((dataset_dict.get(name), reshaped))
+                            dataset_dict[name] = np.concatenate((dataset_dict.get(name), \
+                                reshaped), axis=axis)
             # Extract np.ndarray's from dict and return in its original form
             data = [arr for arr in dataset_dict.values()]
             return data[0] if len(data) == 1 else data
@@ -295,6 +295,7 @@ class LMDBSerializer(LazySerializer):
         if as_numpy:
             db = lmdb.open(path, subdir=isdir, readonly=True)
             dataset_dict = {}
+            axis = 0 if P.data_format() == "channels_first" else -1
             with db.begin() as txn, txn.cursor() as cursor:
                 for key in pkl.loads(cursor.get(b"__keys__")):
                     example = pkl.loads(cursor.get(key))
@@ -307,9 +308,8 @@ class LMDBSerializer(LazySerializer):
                         if name not in dataset_dict.keys():
                             dataset_dict[name] = reshaped
                         else:
-                            dataset_dict[name] = np.vstack((dataset_dict.get(name), reshaped)) \
-                                if P.data_format() == "channels_first" \
-                                else np.hstack((dataset_dict.get(name), reshaped))
+                            dataset_dict[name] = np.concatenate((dataset_dict.get(name), \
+                                reshaped), axis=axis)
             # Extract np.ndarray's from dict and return in its original form
             data = [arr for arr in dataset_dict.values()]
             return data[0] if len(data) == 1 else data
@@ -394,6 +394,7 @@ class NumpySerializer(InMemorySerializer):
         """
         if as_numpy:
             dataset_dict = {}
+            axis = 0 if P.data_format() == "channels_first" else -1
             with np.load(path, allow_pickle=False) as npzfile:
                 for key in list(npzfile.keys()):
                     example = pkl.loads(npzfile.get(key))
@@ -406,9 +407,8 @@ class NumpySerializer(InMemorySerializer):
                         if name not in dataset_dict.keys():
                             dataset_dict[name] = reshaped
                         else:
-                            dataset_dict[name] = np.vstack((dataset_dict.get(name), reshaped)) \
-                                if P.data_format() == "channels_first" \
-                                else np.hstack((dataset_dict.get(name), reshaped))
+                            dataset_dict[name] = np.concatenate((dataset_dict.get(name), \
+                                reshaped), axis=axis)
             # Extract np.ndarray's from dict and return in its original form
             data = [arr for arr in dataset_dict.values()]
             return data[0] if len(data) == 1 else data
@@ -577,6 +577,7 @@ class TFRecordsSerializer(LazySerializer):
         # Parse serialized records into correctly shaped tensors/ndarray's
         if as_numpy:
             dataset_dict = {}
+            axis = 0 if P.data_format() == "channels_first" else -1
             for serialized in tf.python_io.tf_record_iterator(path):
                 example = tf.train.Example()
                 example.ParseFromString(serialized)
@@ -594,9 +595,8 @@ class TFRecordsSerializer(LazySerializer):
                         if name not in dataset_dict.keys():
                             dataset_dict[name] = reshaped
                         else:
-                            dataset_dict[name] = np.vstack((dataset_dict.get(name), reshaped)) \
-                                if P.data_format() == "channels_first" \
-                                else np.hstack((dataset_dict.get(name), reshaped))
+                            dataset_dict[name] = np.concatenate((dataset_dict.get(name), \
+                                reshaped), axis=axis)
             # Extract np.ndarray's from dict and return in its original form
             data = [arr for arr in dataset_dict.values()]
             return data[0] if len(data) == 1 else data

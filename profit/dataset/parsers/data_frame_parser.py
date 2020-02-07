@@ -9,13 +9,13 @@ import pandas as pd
 from rdkit.Chem import rdmolfiles
 from tqdm import tqdm
 
+from profit import backend as P
 from profit.dataset.parsers.base_parser import BaseFileParser
 from profit.dataset.preprocessing.mutator import PDBMutator
 from profit.dataset.preprocessors import preprocess_method_dict
 from profit.dataset.preprocessors.base_preprocessor import BasePreprocessor
 from profit.dataset.preprocessors.seq_preprocessor import SequencePreprocessor
 from profit.dataset.preprocessors.mol_preprocessor import MolPreprocessor
-
 from profit.utils.data_utils.cast import broadcast_array
 
 
@@ -227,8 +227,11 @@ class DataFrameParser(BaseFileParser):
         print('Preprocess finished. FAIL {}, SUCCESS {}, TOTAL {}'.format(\
             fail_count, success_count, total_count))
 
-        # Compile each feature(s) into individual np.ndarray s.t. the first 
-        # channel becomes the num of examples in the dataset.
+        # Compile feature(s) into individual np.ndarray(s), padding each to max  
+        # dims, if necessary. NOTE: The num of examples in the dataset depends 
+        # on the data_format specified (represented by first/last channel).
         all_feats = [broadcast_array(feature) for feature in features] if features else []
+        if P.data_format() == "channels_last":
+            all_feats = [np.moveaxis(feat, 0, -1) for feat in all_feats]
         is_successful = np.array(is_successful_list) if return_is_successful else None
         return {"dataset": all_feats, "is_successful": is_successful}
