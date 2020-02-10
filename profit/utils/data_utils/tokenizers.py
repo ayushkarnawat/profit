@@ -1,8 +1,8 @@
-# NOTE: Maybe we should have both a AA1/AA3 tokenizers (seperately)?
-# Or rather, it should be smart enough to figure out if it is single or double.
-# 
-# TODO: Make special tokenizer for BERT sequences. Allows us to 
-# represent different encoding/decodings for BERT-like tasks.
+"""Different types of sequence tokenizers/encoders/decoders available.
+
+TODO: Should we make a special tokenizer for BERT sequences. Allows us 
+to represent different encoding/decodings for BERT-like tasks.
+"""
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Union

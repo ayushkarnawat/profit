@@ -89,6 +89,6 @@ else:
              alpha=.5, fc='b', ec='None', label='95% confidence interval')
 plt.xlabel('Sequence ($x$)')
 plt.ylabel('Fitness ($y$)')
-plt.title('Prediciting protein fitness using GPR (PDB: 3GB1)')
+plt.title('Predicting protein fitness using GPR (PDB: 3GB1)')
 plt.legend(loc='upper left')
 plt.show()
