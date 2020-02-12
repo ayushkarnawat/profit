@@ -9,7 +9,7 @@ from profit.layers.tensorflow.convs import GraphConvS, GraphConvV
 from profit.layers.tensorflow.embed import GraphEmbed
 from profit.layers.tensorflow.gather import GraphGather
 from profit.layers.tensorflow.nodes import GraphSToS, GraphSToV, GraphVToS, GraphVToV
-from profit.utils.training_utils.metrics import std_mae, std_rmse, std_r2
+from profit.utils.training_utils.tensorflow.metrics import std_mae, std_rmse, std_r2
 
 
 class GCN(object):
@@ -133,4 +133,3 @@ class GCN(object):
             raise ValueError("Unsupported task on model generation.")
         
         return model
-        
