@@ -6,7 +6,7 @@ import warnings
 from typing import Dict, Iterable, Optional, Tuple
 
 import numpy as np
-import tensorflow as tf
+from profit.utils.data_utils import example_pb2
 
 
 def tfrecord_iterator(data_path: str, index_path: Optional[str]=None, 
@@ -116,7 +116,7 @@ def tfrecord_loader(data_path: str, index_path: Optional[str],
     record_iterator = tfrecord_iterator(data_path, index_path, shard)
 
     for record in record_iterator:
-        example = tf.train.Example()
+        example = example_pb2.Example()
         example.ParseFromString(record)
 
         features = {}

@@ -1,6 +1,7 @@
 from profit.utils.data_utils import cacher
 from profit.utils.data_utils import cast
 from profit.utils.data_utils import datasets
+from profit.utils.data_utils import example_pb2
 from profit.utils.data_utils import serializers
 from profit.utils.data_utils import tfreader
 from profit.utils.data_utils import tokenizers

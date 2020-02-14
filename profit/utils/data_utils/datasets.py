@@ -369,15 +369,12 @@ class TorchTFRecordsDataset(IterableDataset):
     """Parse (generic) tensorflow dataset into a `torch.utils.data.IterableDataset` 
     object, which contains `torch.Tensor`s.
     
-    NOTE: This requires using tensorflow (via `tfrecord_loader()`). As 
-    such, the whole purpose of loading data from a tfrecords file to 
-    `torch.Tensor`s is defeated as we should be able to do without 
-    using the tf package. 
-
-    As shown in https://github.com/vahidk/tfrecord, we don't have to 
-    use `tf.train.Example()` to parse through examples. Rather, we can 
-    use `example_pb2.py` provided in the link above to parse an example 
-    by replacing `tf.train.Example()` -> `example_pb2.Example()`.  
+    NOTE: Uses example_pb2 to parse through the serialized records  
+    contained in the tfrecords file. This enables us to convert a 
+    tfrecords file to `torch.Tensor`s without the need to have the 
+    tf package installed. Useful down the line when we decouple the 
+    backends (aka not having one installed should not affect you ability 
+    to use the other backend).
 
     Params:
     -------
