@@ -14,7 +14,7 @@ import tensorflow as tf
 
 from tqdm import tqdm
 from torch.utils.data import Dataset as TorchDataset
-from tensorflow.data import Dataset as TensorflowDataset
+from tensorflow.data import Dataset as TensorflowDataset # pylint: disable=import-error
 
 from profit import backend as P
 from profit.utils.data_utils.datasets import TensorflowHDF5Dataset

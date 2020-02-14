@@ -120,10 +120,10 @@ def tfrecord_loader(data_path: str, index_path: Optional[str],
         example.ParseFromString(record)
 
         features = {}
-        for key in list(example.features.feature.keys()):
+        for key in list(example.features.feature.keys()):           # pylint: disable=no-member
             # NOTE: We assume that each key in the example has only one field 
             # (either "bytes_list", "float_list", or "int64_list")!
-            field = example.features.feature[key].ListFields()[0]
+            field = example.features.feature[key].ListFields()[0]   # pylint: disable=no-member
             tf_typename, value = field[0].name, field[1].value
 
             # Decode raw bytes into respective data types
