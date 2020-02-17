@@ -117,11 +117,11 @@ class GraphConvS(nn.Module):
         Notes:
         ------
         Input shape(s):
-        * sfeats1: :math:`(N, M, M, nfeats)` where :math:`N` 
-            is the number of samples, :math:`M` is the max number of atoms, 
+        * sfeats1: :math:`(N, M, M, nfeats)` where :math:`N` is the 
+            number of samples, :math:`M` is the max number of atoms, 
             and :math:`nfeats` is number of scalar feats in the previous layer.
-        * sfeats2: :math:`(N, M, M, nfeats)` where :math:`N` 
-            is the number of samples, :math:`M` is the max number of atoms, 
+        * sfeats2: :math:`(N, M, M, nfeats)` where :math:`N` is the 
+            number of samples, :math:`M` is the max number of atoms, 
             and :math:`nfeats` is number of scalar feats in the previous layer.
         * adjacency: :math:`(N, M, M)` where :math:`N` is the number of 
             samples, and :math:`M` is the max number of atoms.

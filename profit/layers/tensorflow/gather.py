@@ -12,7 +12,7 @@ class GraphGather(Layer):
     
     Params:
     -------
-   pooling: str, optional, default="sum"
+    pooling: str, optional, default="sum"
         Type of down-sample pooling technique to perform on the hidden representations after the 
         graph convolutions. The representations are either summed, averaged, or maxed depending 
         on the pooling type chosen.
