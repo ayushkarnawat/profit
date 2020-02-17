@@ -72,6 +72,10 @@ class GraphConvS(nn.Module):
         assert n_filters > 0, f"Number of filters (N={n_filters}) must be greater than 0."
         self._n_filters = n_filters
         self._pooling = pooling
+        if activation is not None:
+            assert isinstance(activation, tuple(activations)), f"Invalid " 
+            f"activation func type: {type(activation)}. Should be one of the "
+            f"following: {activations}."
         self._activation = activation
 
         # Add learnable weight/bias params to the layer.
