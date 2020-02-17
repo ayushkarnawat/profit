@@ -105,6 +105,7 @@ class GCN(object):
         sc_out = Dense(self.units_dense, activation='relu', kernel_regularizer=l2(0.005))(sc)
         sc_out = Dense(self.units_dense, activation='relu', kernel_regularizer=l2(0.005))(sc_out)
 
+        # Apply a dense activation layer to each vector feature
         vc_out = TimeDistributed(Dense(self.units_dense, activation='relu', 
                                        kernel_regularizer=l2(0.005)))(vc)
         vc_out = TimeDistributed(Dense(self.units_dense, activation='relu', 
