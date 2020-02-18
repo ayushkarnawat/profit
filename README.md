@@ -22,3 +22,9 @@ Additionally, find `k` additional compounds that, if given the fitness score, ar
 4. Train using BO + batch_size=1 (or more)....batch determined by algorithm (see #2 in notes above)
 5. Visualization
     - Plot results for mutation @ postions 39,40,41,54 for all 20 amino acids (w/ fitness score as heatmap), and label wildtype as black (see DOI: 10.1126/science.aaw2900).
+
+## Misc
+To suppress the annoying pylint no-member warnings, add the following to `.vscode/settings.json` (if using vscode):
+```json
+"python.linting.pylintArgs": ["--generated-members=torch.*"]
+```
