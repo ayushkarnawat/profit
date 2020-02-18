@@ -294,7 +294,7 @@ class TorchHDF5Dataset(Dataset):
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         # Convert to pytorch tensors
         example = json.loads(self.h5file.get(self.keys[idx])[()])
-        return {key: torch.FloatTensor(arr) for key,arr in example.items()} # pylint: disable=no-member
+        return {key: torch.FloatTensor(arr) for key,arr in example.items()}
 
 
 class TorchLMDBDataset(Dataset):
@@ -336,7 +336,7 @@ class TorchLMDBDataset(Dataset):
         
         with self.db.begin() as txn, txn.cursor() as cursor:
             example = pkl.loads(cursor.get(self.keys[idx]))
-            return {key: torch.FloatTensor(arr) for key,arr in example.items()} # pylint: disable=no-member
+            return {key: torch.FloatTensor(arr) for key,arr in example.items()}
 
 
 class TorchNumpyDataset(Dataset):
@@ -362,7 +362,7 @@ class TorchNumpyDataset(Dataset):
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         # Convert to pytorch tensors
         example = pkl.loads(self.npzfile.get(self.keys[idx]))
-        return {key: torch.FloatTensor(arr) for key,arr in example.items()} # pylint: disable=no-member
+        return {key: torch.FloatTensor(arr) for key,arr in example.items()}
 
 
 class TorchTFRecordsDataset(IterableDataset):
@@ -390,8 +390,8 @@ class TorchTFRecordsDataset(IterableDataset):
         # Shard/Chunk dataset if multiple workers are iterating over dataset
         worker_info = torch.utils.data.get_worker_info()
         if worker_info is not None:
-            shard = worker_info.id, worker_info.num_workers # pylint: disable=no-member
-            np.random.seed(worker_info.seed % np.iinfo(np.uint32).max) # pylint: disable=no-member
+            shard = worker_info.id, worker_info.num_workers
+            np.random.seed(worker_info.seed % np.iinfo(np.uint32).max)
         else:
             shard = None
 
