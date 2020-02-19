@@ -4,6 +4,8 @@ graph embed layer, gather layer, and nodes layer.
 [WIP]: How to incorporate bayesian optimization/combinatorial search 
 within the graphical network??? NOTE: Each call to bayesian opt is 
 expensive (since it is "online" learning).
+
+Adapated from: https://git.io/Jv49v, https://git.io/Jv49t, https://git.io/Jv4AZ
 """
 
 import inspect
@@ -21,7 +23,7 @@ Activations = TypeVar("activations", *activations) # for type-checking purposes
 
 class GraphConvS(nn.Module):
     """Graph convolution layer for scalar features.
-    
+
     Each scalar feature :math: `s \\in \\mathbb{R}^M` describes the 
     individual features for each atom in the molecule.
 
@@ -36,29 +38,28 @@ class GraphConvS(nn.Module):
     Params:
     -------
     n_filters: int
-        The number of filters/kernels to use. This is the number of 
-        atom-level features in a mol.
-    
+        The number of filters/kernels to use.
+
     pooling: str, optional, default="sum"
         Type of down-sample pooling technique to perform on the hidden 
         representations after the graph convolutions. Depending on the 
         pooling type chosen, the representations are etiher summed, 
         averaged, or maxed.
-    
-    bias: bool, default="sum"
+
+    bias: bool, default=True
         If True, adds a learnable bias to the convolved output.
-    
+
     activation: callable activation function or None, optional, default=None
         If not None, applies an activation function to the updated node 
         features. See ::module:`torch.nn.modules.activation` for list 
         of all possible activation functions.
-    
+
     Attributes
     ----------
-    weight : torch.Tensor
+    weight: torch.Tensor
         The learnable weight tensor.
-    
-    bias : torch.Tensor
+
+    bias: torch.Tensor
         The learnable bias tensor.
     """
 
@@ -89,16 +90,18 @@ class GraphConvS(nn.Module):
             self.register_parameter('bias', None)
         self.reset_parameters() # init weights for 1st optim step
 
-    def reset_parameters(self):
+
+    def reset_parameters(self) -> None:
         """Reinitialize all learnable parameters."""
         init.xavier_uniform_(self.weight)
         if self.bias is not None:
             init.zeros_(self.bias)
 
+
     def forward(self, inputs: Union[Tensor, List[Tensor], Tuple[Tensor, ...]]) \
                 -> torch.Tensor:
         """Compute graph convolution.
-        
+
         Convolve two atom scalar features :math:`s_1, s_2`. Specifically, 
         we (a) concatenate both scalars, (b) convolve features, (c) 
         multiply using the adjacency matrix, (d) downsample through 
@@ -112,7 +115,7 @@ class GraphConvS(nn.Module):
         Returns:
         --------
         sfeats: torch.Tensor
-            Output tensor after convolution, pooling, and activation.
+            Output tensor after computation.
 
         Notes:
         ------
@@ -125,7 +128,7 @@ class GraphConvS(nn.Module):
             and :math:`nfeats` is number of scalar feats in the previous layer.
         * adjacency: :math:`(N, M, M)` where :math:`N` is the number of 
             samples, and :math:`M` is the max number of atoms.
-        
+
         Output shape:
         * sfeats: :math:`(N, M, \\text{n_filters})` where :math:`N` is 
             the number of samples, :math:`M` is the max number of atoms.
@@ -137,8 +140,8 @@ class GraphConvS(nn.Module):
         scalar_feats_1, scalar_feats_2, adjacency = inputs
 
         # Get parameters
-        # NOTE: This is assuming that the # samples are in channels_first. 
-        # Change to support channels_last? 
+        # NOTE: Assuming that the num_samples are in channels_first. 
+        # Change to support channels_last?
         N = int(scalar_feats_1.shape[1])    # max number of atoms
         M1 = int(scalar_feats_1.shape[-1])  # num of features in s_1
         M2 = int(scalar_feats_2.shape[-1])  # num of features in s_2
@@ -169,12 +172,13 @@ class GraphConvS(nn.Module):
         # 5. Activation, 3D tensor
         if self._activation is not None:
             sfeats = self._activation(sfeats)
-        
+
         return sfeats
 
+
     def extra_repr(self) -> str:
-        """String representation of the module. 
-        
+        """String representation of the module.
+
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
@@ -186,7 +190,7 @@ class GraphConvS(nn.Module):
 
 class GraphConvV(nn.Module):
     """Graph convolution layer for vector features.
-    
+
     Each vector feature :math: `V \\in \\mathbb{R}^{M \\times 3}` 
     describes the vector features (which include 3D for XYZ coords) for 
     each atom in the molecule.
@@ -203,27 +207,27 @@ class GraphConvV(nn.Module):
     -------
     n_filters: int
         The number of filters/kernels to use.
-    
+
     pooling: str, optional, default="sum"
         Type of down-sample pooling technique to perform on the hidden 
         representations after the graph convolutions. Depending on the 
         pooling type chosen, the representations are etiher summed, 
         averaged, or maxed.
-    
-    bias: bool, default="sum"
+
+    bias: bool, default=True
         If True, adds a learnable bias to the convolved output.
-    
+
     activation: callable activation function or None, optional, default=None
         If not None, applies an activation function to the updated node 
         features. See ::module:`torch.nn.modules.activation` for list 
         of all possible activation functions.
-    
+
     Attributes
     ----------
-    weight : torch.Tensor
+    weight: torch.Tensor
         The learnable weight tensor.
-    
-    bias : torch.Tensor
+
+    bias: torch.Tensor
         The learnable bias tensor.
     """
 
@@ -254,16 +258,18 @@ class GraphConvV(nn.Module):
             self.register_parameter('bias', None)
         self.reset_parameters() # init weights for 1st optim step
 
-    def reset_parameters(self):
+
+    def reset_parameters(self) -> None:
         """Reinitialize all learnable parameters."""
         init.xavier_uniform_(self.weight)
         if self.bias is not None:
             init.zeros_(self.bias)
 
+
     def forward(self, inputs: Union[Tensor, List[Tensor], Tuple[Tensor, ...]]) \
                 -> torch.Tensor:
         """Compute graph convolution.
-        
+
         Convolve two atom scalar features :math:`V_1, V_2`. Specifically, 
         we (a) concatenate both vectors, (b) convolve features, (c) 
         multiply using the adjacency matrix, (d) downsample through 
@@ -277,7 +283,7 @@ class GraphConvV(nn.Module):
         Returns:
         --------
         vfeats: torch.Tensor
-            Output tensor after convolution, pooling, and activation.
+            Output tensor after computation.
 
         Notes:
         ------
@@ -290,7 +296,7 @@ class GraphConvV(nn.Module):
             and :math:`nfeats` is number of vector feats in the previous layer.
         * adjacency: :math:`(N, M, M)` where :math:`N` is the number of 
             samples, and :math:`M` is the max number of atoms.
-        
+
         Output shape:
         * vfeats: :math:`(N, M, 3, \\text{n_filters})` where :math:`N` is 
             the number of samples, :math:`M` is the max number of atoms.
@@ -302,8 +308,8 @@ class GraphConvV(nn.Module):
         vector_feats_1, vector_feats_2, adjacency = inputs
 
         # Get parameters
-        # NOTE: This is assuming that the # samples are in channels_first. 
-        # Change to support channels_last? 
+        # NOTE: Assuming that the num_samples are in channels_first. 
+        # Change to support channels_last?
         N = int(vector_feats_1.shape[1])    # max number of atoms
         M1 = int(vector_feats_1.shape[-1])  # num of features in V_1
         M2 = int(vector_feats_2.shape[-1])  # num of features in V_2
@@ -338,13 +344,685 @@ class GraphConvV(nn.Module):
 
         return vfeats
 
+
+    def extra_repr(self) -> str:
+        """String representation of the module. 
+
+        Sets the extra representation, which comes into effect when 
+        printing the (full) model summary.
+        """
+        summary = 'n_filters={_n_filters}, pooling={_pooling}'
+        if '_activation' in self.__dict__:
+            summary += ', activation={_activation}'
+        return summary.format(**self.__dict__)
+
+
+class GraphEmbed(nn.Module):
+    """Joint graph embedding of atoms and their relative distances.
+
+    NOTE: Although called an embeddings layer, the "embeddings" are not 
+    trainable. Rather, it just processes the inputs to a common shape.
+    """
+
+    def __init__(self):
+        super(GraphEmbed, self).__init__()
+
+
+    def forward(self, inputs: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor, ...]]) \
+                -> List[torch.Tensor]:
+        """Generate scalar and vector features for atoms and their 
+        distances, respectively.
+
+        Params:
+        -------
+        inputs: torch.Tensor or list/tuple of torch.Tensors.
+            Inputs to the current module/layer.
+
+        Returns:
+        --------
+        sfeats: torch.Tensor
+            Atom scalar features.
+
+        vfeats: torch.Tensor
+            Atom vector features.
+        """
+        # NOTE: The scalar features (sfeats) are the computed atomic features itself
+        # atoms = (samples, max_atoms, num_atom_feats)
+        # distances = (samples, max_atoms, max_atoms, coor_dims)
+        sfeats, distances = inputs
+
+        # Get parameters
+        # NOTE: Assuming that the num_samples are in channels_first. 
+        # Change to support channels_last?
+        max_atoms = int(sfeats.shape[1])
+        num_atom_feats = int(sfeats.shape[-1])
+        coor_dims = int(distances.shape[-1])
+
+        # Generate vector feats filled with zeros, 4D tensor
+        vfeats = torch.zeros_like(sfeats)
+        vfeats = torch.reshape(vfeats, shape=(-1, max_atoms, 1, num_atom_feats))
+        vfeats = vfeats.repeat(1, 1, coor_dims, 1)
+
+        return [sfeats, vfeats]
+
+
+class GraphGather(nn.Module):
+    """Concatenates (pools) info across all atoms for each scalar and 
+    vector feature in the graph.
+
+    Allows the model to obtain more global information about the graph.
+
+    Params:
+    -------
+    pooling: str, optional, default="sum"
+        Type of down-sample pooling technique to perform on the hidden 
+        representations after the graph convolutions. Depending on the 
+        pooling type chosen, the representations are etiher summed, 
+        averaged, or maxed.
+
+    system: str, optional, default="cartesian"
+        Whether to represent the data in spherical :math:`(r, \\theta, 
+        \\phi)` or cartesian (XYZ) coordinates.
+
+    activation: callable activation function or None, optional, default=None
+        If not None, applies an activation function to the updated node 
+        features. See ::module:`torch.nn.modules.activation` for list 
+        of all possible activation functions.
+    """
+
+    def __init__(self, pooling: str="sum", system: str="cartesian", 
+                 activation: Optional[Activations]=None):
+        super(GraphGather, self).__init__()
+
+        self._pooling = pooling
+        self._system = system
+        if activation is not None:
+            assert isinstance(activation, tuple(activations)), f"Invalid " 
+            f"activation func type: {type(activation)}. Should be one of the "
+            f"following: {activations}."
+        self._activation = activation
+
+
+    def forward(self, inputs: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor, ...]]) \
+                -> List[torch.Tensor]:
+        """Gather (concatenate) atom level information for the scalar 
+        and vector features.
+
+        More specifically, we (a) combine (integrate) over all the 
+        features/information contained in the atom axis through pooling, 
+        (b) apply a non-linear activation (if provided), and (c) map to 
+        the specified coordinate system.
+
+        Params:
+        -------
+        inputs: torch.Tensor or list/tuple of torch.Tensors.
+            Inputs to the current module/layer.
+
+        Returns:
+        --------
+        scalar_features: torch.Tensor
+            Atom scalar features.
+
+        vector_features: torch.Tensor
+            Atom vector features.
+        """
+        # Import graph tensors
+        # scalar_features = (samples, max_atoms, atom_feat)
+        # vector_features = (samples, max_atoms, coor_dims, atom_feat)
+        scalar_features, vector_features = inputs
+
+        # Get parameters
+        # NOTE: Assuming that the num_samples are in channels_first. 
+        # Change to support channels_last?
+        coor_dims = int(vector_features.shape[2])
+        atom_feat = int(vector_features.shape[-1])
+
+        # 1. Integrate over atom axis
+        # TODO: Debug, this might be wrong (for vector features)
+        if self.pooling == "sum":
+            scalar_features = torch.sum(scalar_features, dim=1)
+            vector_features = torch.sum(vector_features, dim=1)
+        elif self.pooling == "mean":
+            scalar_features = torch.mean(scalar_features, dim=1)
+            vector_features = torch.mean(vector_features, dim=1)
+        elif self.pooling == "max":
+            scalar_features = torch.max(scalar_features, dim=1)
+            # Select the vector feats that are max across all XYZ coordinates
+            # NOTE: The reason we permute axis is so that we can use torch.gather along dim=-1
+            vector_features = vector_features.permute(0, 2, 3, 1) # (samples, coor_dims, atom_feat, max_atoms)
+            size = torch.sqrt(torch.sum(torch.square(vector_features), dim=1)) # (samples, atom_feat, max_atoms)
+            # idxs of which atom has the highest value for that particular feature  
+            idx = torch.reshape(torch.argmax(size, dim=-1), shape=(-1, 1, atom_feat, 1)) # (samples, 1, atom_feats, 1)
+            idx = idx.repeat(1, coor_dims, 1, 1) # (samples, coor_dims, atom_feats, 1)
+            vector_features = torch.reshape(torch.gather(vector_features, dim=-1, index=idx), 
+                                            shape=(-1, coor_dims, atom_feat))
+
+        # 2. Activation
+        if self._activation is not None:
+            scalar_features = self._activation(scalar_features) # (samples, atom_feat)
+            vector_features = self._activation(vector_features) # (samples, coor_dims, atom_feat)
+
+        # 3. Map to spherical coordinates, if specified
+        if self._system == "spherical":
+            x, y, z = torch.unbind(vector_features, dim=1)
+            r = torch.sqrt(torch.square(x) + torch.square(y) + torch.square(z))
+            # NOTE: We add 1 to all elements of x,r that are equal to 0 to avoid 
+            # ZeroDivisionError. Additionally, we assume that the either r/z and 
+            # x/y is of type torch.float
+            t = torch.acos(z / (r + (r==0).type(torch.float)))
+            p = torch.atan(y / (x + (x==0).type(torch.float)))
+            vector_features = torch.stack([r, t, p], dim=1)
+
+        return [scalar_features, vector_features]
+
+
     def extra_repr(self) -> str:
         """String representation of the module. 
         
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = 'n_filters={_n_filters}, pooling={_pooling}'
+        summary = 'pooling={_pooling}, coord_system={_system}'
+        if '_activation' in self.__dict__:
+            summary += ', activation={_activation}'
+        return summary.format(**self.__dict__)
+
+
+class GraphSToS(nn.Module):
+    """Scalar to scalar computation.
+
+    Params:
+    -------
+    n_filters: int
+        The number of filters/kernels to use.
+
+    bias: bool, default=True
+        If True, adds a learnable bias to the convolved output.
+
+    activation: callable activation function or None, optional, default=None
+        If not None, applies an activation function to the updated node 
+        features. See ::module:`torch.nn.modules.activation` for list 
+        of all possible activation functions.
+
+    Attributes:
+    -----------
+    weight: torch.Tensor
+        The learnable weight tensor.
+
+    bias: torch.Tensor
+        The learnable bias tensor.
+    """
+
+    def __init__(self, n_filters: int, bias: bool=True, 
+                 activation: Optional[Activations]=None):
+        super(GraphSToS, self).__init__()
+
+        assert n_filters > 0, f"Number of filters (N={n_filters}) must be greater than 0."
+        self._n_filters = n_filters
+
+        if activation is not None:
+            assert isinstance(activation, tuple(activations)), f"Invalid " 
+            f"activation func type: {type(activation)}. Should be one of the "
+            f"following: {activations}."
+        self._activation = activation
+
+        # Add learnable weight/bias params to the layer.
+        # NOTE: The in_feats, out_feats should be computed via the shapes of the previous layers.
+        # TODO: Dummy values, remove
+        in_feats = 10
+        self.weight = nn.Parameter(Tensor(in_feats, n_filters), requires_grad=True)
+        if bias:
+            self.bias = nn.Parameter(Tensor(n_filters))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters() # init weights for 1st optim step
+
+
+    def reset_parameters(self) -> None:
+        """Reinitialize all learnable parameters."""
+        init.xavier_uniform_(self.weight)
+        if self.bias is not None:
+            init.zeros_(self.bias)
+
+
+    def forward(self, inputs: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor, ...]]) \
+                -> torch.Tensor:
+        """Compute inter-atomic scalar to scalar features.
+
+        More specifically, we (a) permute the scalar features for (b) 
+        proper concatenation, (c) apply the learned weights from the 
+        layer, and (d) apply a non-linear activation, if specified.
+
+        Params:
+        -------
+        inputs: torch.Tensor or list/tuple of torch.Tensors.
+            Inputs to the current layer.
+
+        Returns:
+        --------
+        scalar_features: torch.Tensor
+            Output tensor after computation.
+        """
+        # Import graph tensors
+        # scalar_features = (samples, max_atoms, atom_feat)
+        scalar_features = inputs
+
+        # Get parameters
+        # NOTE: Assuming that the num_samples are in channels_first. 
+        # Change to support channels_last? 
+        max_atoms = int(scalar_features.shape[1])
+        atom_feat = int(scalar_features.shape[-1])
+
+        # 1. Expand scalar features, 4D tensor
+        scalar_features = torch.reshape(scalar_features, shape=(-1, max_atoms, 1, atom_feat))
+        scalar_features = scalar_features.repeat(1, 1, max_atoms, 1)
+
+        # 2. Combine between atoms, 4D tensor
+        scalar_features_t = scalar_features.permute(0, 2, 1, 3)
+        scalar_features = torch.cat((scalar_features, scalar_features_t), dim=-1)
+
+        # 3. Apply weights, 4D tensor
+        scalar_features = torch.reshape(scalar_features, shape=(-1, atom_feat * 2))
+        scalar_features = torch.matmul(scalar_features, self.weight)
+        if self.bias is not None:
+            scalar_features = scalar_features + self.bias
+        scalar_features = torch.reshape(scalar_features, shape=(-1, max_atoms, max_atoms, self.filters))
+
+        # 4. Activation, 4D tensor
+        if self._activation is not None:
+            scalar_features = self._activation(scalar_features)
+
+        return scalar_features
+
+
+    def extra_repr(self) -> str:
+        """String representation of the module. 
+
+        Sets the extra representation, which comes into effect when 
+        printing the (full) model summary.
+        """
+        summary = 'n_filters={_n_filters}'
+        if '_activation' in self.__dict__:
+            summary += ', activation={_activation}'
+        return summary.format(**self.__dict__)
+
+
+class GraphSToV(nn.Module):
+    """Scalar to vector computation.
+
+    Params:
+    -------
+    n_filters: int
+        The number of filters/kernels to use.
+
+    bias: bool, default=True
+        If True, adds a learnable bias to the convolved output.
+
+    activation: callable activation function or None, optional, default=None
+        If not None, applies an activation function to the updated node 
+        features. See ::module:`torch.nn.modules.activation` for list 
+        of all possible activation functions.
+
+    Attributes:
+    -----------
+    weight: torch.Tensor
+        The learnable weight tensor.
+
+    bias: torch.Tensor
+        The learnable bias tensor.
+    """
+
+    def __init__(self, n_filters: int, bias: bool=True, 
+                 activation: Optional[Activations]=None):
+        super(GraphSToV, self).__init__()
+
+        assert n_filters > 0, f"Number of filters (N={n_filters}) must be greater than 0."
+        self._n_filters = n_filters
+
+        if activation is not None:
+            assert isinstance(activation, tuple(activations)), f"Invalid " 
+            f"activation func type: {type(activation)}. Should be one of the "
+            f"following: {activations}."
+        self._activation = activation
+
+        # Add learnable weight/bias params to the layer.
+        # NOTE: The in_feats, out_feats should be computed via the shapes of the previous layers.
+        # TODO: Dummy values, remove
+        in_feats = 10
+        self.weight = nn.Parameter(Tensor(in_feats, n_filters), requires_grad=True)
+        if bias:
+            self.bias = nn.Parameter(Tensor(n_filters))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters() # init weights for 1st optim step
+
+
+    def reset_parameters(self) -> None:
+        """Reinitialize all learnable parameters."""
+        init.xavier_uniform_(self.weight)
+        if self.bias is not None:
+            init.zeros_(self.bias)
+
+
+    def forward(self, inputs: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor, ...]]) \
+                -> torch.Tensor:
+        """Compute atomic scalar to vector features.
+
+        Specifically, we (a) expand the scalar features, (b) permute 
+        them for proper concatenation, (c) apply the learned weights 
+        from the layer, (d) multiply (element-wise) with the distance  
+        matrix, and (e) apply a non-linear activation, if specified.
+
+        Params:
+        -------
+        inputs: torch.Tensor or list/tuple of torch.Tensors.
+            Inputs to the current layer.
+
+        Returns:
+        --------
+        vector_features: torch.Tensor
+            Output tensor after computation.
+        """
+        # Import graph tensors
+        # scalar_features = (samples, max_atoms, atom_feat)
+        # distances = (samples, max_atoms, max_atoms, coor_dims)
+        scalar_features, distances = inputs
+
+        # Get parameters
+        max_atoms = int(scalar_features.shape[1])
+        atom_feat = int(scalar_features.shape[-1])
+        coor_dims = int(distances.shape[-1])
+
+        # 1. Expand scalar features, 4D tensor
+        scalar_features = torch.reshape(scalar_features, shape=(-1, max_atoms, 1, atom_feat))
+        scalar_features = scalar_features.repeat(1, 1, max_atoms, 1)
+
+        # 2. Combine between atoms, 4D tensor
+        scalar_features_t = scalar_features.permute(0, 2, 1, 3)
+        scalar_features = torch.cat((scalar_features, scalar_features_t), dim=-1)
+
+        # 3. Apply weights, 5D tensor
+        scalar_features = torch.reshape(scalar_features, shape=(-1, atom_feat * 2))
+        scalar_features = torch.matmul(scalar_features, self.weight)
+        if self.bias is not None:
+            scalar_features = scalar_features + self.bias
+        scalar_features = torch.reshape(scalar_features, shape=(-1, max_atoms, max_atoms, 1, self.filters))
+        scalar_features = scalar_features.repeat(1, 1, 1, coor_dims, 1)
+
+        # 4. Expand relative distances, 5D tensor
+        distances = torch.reshape(distances, shape=(-1, max_atoms, max_atoms, coor_dims, 1))
+        distances = distances.repeat(1, 1, 1, 1, self.filters)
+
+        # 5. Tensor product, element-wise multiplication
+        vector_features = torch.mul(scalar_features, distances)
+
+        # 6. Activation
+        if self._activation is not None:
+            vector_features = self._activation(vector_features)
+
+        return vector_features
+
+
+    def extra_repr(self) -> str:
+        """String representation of the module. 
+
+        Sets the extra representation, which comes into effect when 
+        printing the (full) model summary.
+        """
+        summary = 'n_filters={_n_filters}'
+        if '_activation' in self.__dict__:
+            summary += ', activation={_activation}'
+        return summary.format(**self.__dict__)
+
+
+class GraphVToS(nn.Module):
+    """Vector to scalar computation.
+
+    Params:
+    -------
+    n_filters: int
+        The number of filters/kernels to use.
+
+    bias: bool, default=True
+        If True, adds a learnable bias to the convolved output.
+
+    activation: callable activation function or None, optional, default=None
+        If not None, applies an activation function to the updated node 
+        features. See ::module:`torch.nn.modules.activation` for list 
+        of all possible activation functions.
+
+    Attributes:
+    -----------
+    weight: torch.Tensor
+        The learnable weight tensor.
+
+    bias: torch.Tensor
+        The learnable bias tensor.
+    """
+
+    def __init__(self, n_filters: int, bias: bool=True, 
+                 activation: Optional[Activations]=None):
+        super(GraphVToS, self).__init__()
+
+        assert n_filters > 0, f"Number of filters (N={n_filters}) must be greater than 0."
+        self._n_filters = n_filters
+
+        if activation is not None:
+            assert isinstance(activation, tuple(activations)), f"Invalid " 
+            f"activation func type: {type(activation)}. Should be one of the "
+            f"following: {activations}."
+        self._activation = activation
+
+        # Add learnable weight/bias params to the layer.
+        # NOTE: The in_feats, out_feats should be computed via the shapes of the previous layers.
+        # TODO: Dummy values, remove
+        in_feats = 10
+        self.weight = nn.Parameter(Tensor(in_feats, n_filters), requires_grad=True)
+        if bias:
+            self.bias = nn.Parameter(Tensor(n_filters))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters() # init weights for 1st optim step
+
+
+    def reset_parameters(self) -> None:
+        """Reinitialize all learnable parameters."""
+        init.xavier_uniform_(self.weight)
+        if self.bias is not None:
+            init.zeros_(self.bias)
+
+
+    def forward(self, inputs: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor, ...]]) \
+                -> torch.Tensor:
+        """Compute atomic vector to scalar features.
+
+        Specifically, we (a) expand the vector features, (b) permute 
+        them for proper concatenation, (c) apply the learned weights 
+        from the layer, (d) project the vector onto r through (element-
+        wise) multiplication, and (e) apply a non-linear activation, 
+        if specified.
+
+        Params:
+        -------
+        inputs: torch.Tensor or list/tuple of torch.Tensors.
+            Inputs to the current layer.
+
+        Returns:
+        --------
+        scalar_features: torch.Tensor
+            Output tensor after computation.
+        """
+        # Import graph tensors
+        # vector_features = (samples, max_atoms, coor_dims, atom_feat)
+        # distances = (samples, max_atoms, max_atoms, coor_dims)
+        vector_features, distances = inputs
+
+        # Get parameters
+        max_atoms = int(vector_features.shape[1])
+        atom_feat = int(vector_features.shape[-1])
+        coor_dims = int(vector_features.shape[-2])
+
+        # 1. Expand vector features to 5D
+        vector_features = torch.reshape(vector_features, shape=(-1, max_atoms, 1, coor_dims, atom_feat))
+        vector_features = vector_features.repeat(1, 1, max_atoms, 1, 1)
+
+        # 2. Combine between atoms
+        vector_features_t = vector_features.permute(0, 2, 1, 3, 4)
+        vector_features = torch.cat((vector_features, vector_features_t), dim=-1)
+
+        # 3. Apply weights
+        vector_features = torch.reshape(vector_features, shape=(-1, atom_feat * 2))
+        vector_features = torch.matmul(vector_features, self.weight)
+        if self.bias is not None:
+            vector_features = vector_features + self.bias
+        vector_features = torch.reshape(vector_features, shape=(-1, max_atoms, max_atoms, coor_dims, self.filters))
+
+        # # 4. Calculate r^ = r / |r| and expand it to 5D
+        # distances_hat = torch.sqrt(torch.sum(torch.square(distances), dim=-1, keepdim=True))
+        # distances_hat = distances_hat + torch.eq(distances_hat, 0).type(torch.float)
+        # distances_hat = torch.div(distances, distances_hat)
+        # distances_hat = torch.reshape(distances_hat, shape=(-1, max_atoms, max_atoms, coor_dims, 1))
+        # distances_hat = distances_hat.repeat(1, 1, 1, 1, self.filters)
+        distances_hat = torch.reshape(distances, shape=(-1, max_atoms, max_atoms, coor_dims, 1))
+        distances_hat = distances_hat.repeat(1, 1, 1, 1, self.filters)
+
+        # 5. Projection of v onto r = v (dot) r^
+        scalar_features = torch.mul(vector_features, distances_hat)
+        scalar_features = torch.sum(scalar_features, dim=-2)
+
+        # 6. Activation
+        if self._activation is not None:
+            scalar_features = self.activation(scalar_features)
+
+        return scalar_features
+
+
+    def extra_repr(self) -> str:
+        """String representation of the module. 
+
+        Sets the extra representation, which comes into effect when 
+        printing the (full) model summary.
+        """
+        summary = 'n_filters={_n_filters}'
+        if '_activation' in self.__dict__:
+            summary += ', activation={_activation}'
+        return summary.format(**self.__dict__)
+
+
+class GraphVtoV(nn.Module):
+    """Vector to vector computation.
+
+    Params:
+    -------
+    n_filters: int
+        The number of filters/kernels to use.
+
+    bias: bool, default=True
+        If True, adds a learnable bias to the convolved output.
+
+    activation: callable activation function or None, optional, default=None
+        If not None, applies an activation function to the updated node 
+        features. See ::module:`torch.nn.modules.activation` for list 
+        of all possible activation functions.
+
+    Attributes:
+    -----------
+    weight: torch.Tensor
+        The learnable weight tensor.
+
+    bias: torch.Tensor
+        The learnable bias tensor.
+    """
+
+    def __init__(self, n_filters: int, bias: bool=True, 
+                 activation: Optional[Activations]=None):
+        super(GraphVToV, self).__init__()
+
+        assert n_filters > 0, f"Number of filters (N={n_filters}) must be greater than 0."
+        self._n_filters = n_filters
+
+        if activation is not None:
+            assert isinstance(activation, tuple(activations)), f"Invalid " 
+            f"activation func type: {type(activation)}. Should be one of the "
+            f"following: {activations}."
+        self._activation = activation
+
+        # Add learnable weight/bias params to the layer.
+        # NOTE: The in_feats, out_feats should be computed via the shapes of the previous layers.
+        # TODO: Dummy values, remove
+        in_feats = 10
+        self.weight = nn.Parameter(Tensor(in_feats, n_filters), requires_grad=True)
+        if bias:
+            self.bias = nn.Parameter(Tensor(n_filters))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters() # init weights for 1st optim step
+
+
+    def reset_parameters(self) -> None:
+        """Reinitialize all learnable parameters."""
+        init.xavier_uniform_(self.weight)
+        if self.bias is not None:
+            init.zeros_(self.bias)
+
+
+    def forward(self, inputs: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor, ...]]) \
+                -> torch.Tensor:
+        """Compute atomic vector to vector features.
+
+        Specifically, we (a) expand the vector features, (b) permute 
+        them for proper concatenation, (c) apply the learned weights 
+        from the layer, and (d) apply a non-linear activation, if 
+        specified.
+
+        Params:
+        -------
+        inputs: torch.Tensor or list/tuple of torch.Tensors.
+            Inputs to the current layer.
+
+        Returns:
+        --------
+        vector_features: torch.Tensor
+            Output tensor after computation.
+        """
+        # Import graph tensors
+        # vector_features = (samples, max_atoms, coor_dims, atom_feat)
+        vector_features = inputs
+
+        # Get parameters
+        max_atoms = int(vector_features.shape[1])
+        atom_feat = int(vector_features.shape[-1])
+        coor_dims = int(vector_features.shape[-2])
+
+        # 1. Expand vector features to 5D
+        vector_features = torch.reshape(vector_features, shape=(-1, max_atoms, 1, coor_dims, atom_feat))
+        vector_features = vector_features.repeat(1, 1, max_atoms, 1, 1)
+
+        # 2. Combine between atoms
+        vector_features_t = vector_features.permute(0, 2, 1, 3, 4)
+        vector_features = torch.cat((vector_features, vector_features_t), dim=-1)
+
+        # 3. Apply weights
+        vector_features = torch.reshape(vector_features, shape=(-1, atom_feat * 2))
+        vector_features = torch.matmul(vector_features, self.weight) 
+        if self.bias is not None:
+            vector_features = vector_features + self.bias
+        vector_features = torch.reshape(vector_features, shape=(-1, max_atoms, max_atoms, coor_dims, self.filters))
+
+        # 4. Activation
+        if self._activation is not None:
+            vector_features = self._activation(vector_features)
+
+        return vector_features
+
+
+    def extra_repr(self) -> str:
+        """String representation of the module. 
+
+        Sets the extra representation, which comes into effect when 
+        printing the (full) model summary.
+        """
+        summary = 'n_filters={_n_filters}'
         if '_activation' in self.__dict__:
             summary += ', activation={_activation}'
         return summary.format(**self.__dict__)
