@@ -159,7 +159,7 @@ class GraphConvS(nn.Module):
         # 3. Adjacency masking, 4D tensor
         adjacency = torch.reshape(adjacency, shape=(-1, N, N, 1))
         adjacency = adjacency.repeat(1, 1, 1, self.filters)
-        sfeats = sfeats * adjacency # element-wise multiplication
+        sfeats = torch.mul(sfeats, adjacency) # element-wise multiplication
 
         # 4. Integrate over second atom axis, 3D tensor
         if self._pooling == "sum":
@@ -182,9 +182,9 @@ class GraphConvS(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = 'n_filters={_n_filters}, pooling={_pooling}'
-        if '_activation' in self.__dict__:
-            summary += ', activation={_activation}'
+        summary = "n_filters={_n_filters}, pooling={_pooling}"
+        if "_activation" in self.__dict__:
+            summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
 
 
@@ -328,7 +328,7 @@ class GraphConvV(nn.Module):
         # 3. Adjacency masking, 5D tensor
         adjacency = torch.reshape(adjacency, shape=(-1, N, N, 1, 1))
         adjacency = adjacency.repeat(1, 1, 1, D, self.filters)
-        vfeats = vfeats * adjacency # element-wise multiplication
+        vfeats = torch.mul(vfeats, adjacency) # element-wise multiplication
 
         # 4. Integrate over second atom axis, 4D tensor
         if self.pooling == "sum":
@@ -351,9 +351,9 @@ class GraphConvV(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = 'n_filters={_n_filters}, pooling={_pooling}'
-        if '_activation' in self.__dict__:
-            summary += ', activation={_activation}'
+        summary = "n_filters={_n_filters}, pooling={_pooling}"
+        if "_activation" in self.__dict__:
+            summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
 
 
@@ -509,8 +509,8 @@ class GraphGather(nn.Module):
             # NOTE: We add 1 to all elements of x,r that are equal to 0 to avoid 
             # ZeroDivisionError. Additionally, we assume that the either r/z and 
             # x/y is of type torch.float
-            t = torch.acos(z / (r + (r==0).type(torch.float)))
-            p = torch.atan(y / (x + (x==0).type(torch.float)))
+            t = torch.acos(z / (r + torch.eq(r,0).type(torch.float)))
+            p = torch.atan(y / (x + torch.eq(x,0).type(torch.float)))
             vector_features = torch.stack([r, t, p], dim=1)
 
         return [scalar_features, vector_features]
@@ -522,9 +522,9 @@ class GraphGather(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = 'pooling={_pooling}, coord_system={_system}'
-        if '_activation' in self.__dict__:
-            summary += ', activation={_activation}'
+        summary = "pooling={_pooling}, coord_system={_system}"
+        if "_activation" in self.__dict__:
+            summary += "", activation={_activation}"
         return summary.format(**self.__dict__)
 
 
@@ -641,9 +641,9 @@ class GraphSToS(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = 'n_filters={_n_filters}'
-        if '_activation' in self.__dict__:
-            summary += ', activation={_activation}'
+        summary = "n_filters={_n_filters}"
+        if "_activation" in self.__dict__:
+            summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
 
 
@@ -769,9 +769,9 @@ class GraphSToV(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = 'n_filters={_n_filters}'
-        if '_activation' in self.__dict__:
-            summary += ', activation={_activation}'
+        summary = "n_filters={_n_filters}"
+        if "_activation" in self.__dict__:
+            summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
 
 
@@ -903,9 +903,9 @@ class GraphVToS(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = 'n_filters={_n_filters}'
-        if '_activation' in self.__dict__:
-            summary += ', activation={_activation}'
+        summary = "n_filters={_n_filters}"
+        if "_activation" in self.__dict__:
+            summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
 
 
@@ -1022,7 +1022,7 @@ class GraphVtoV(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = 'n_filters={_n_filters}'
-        if '_activation' in self.__dict__:
-            summary += ', activation={_activation}'
+        summary = "n_filters={_n_filters}"
+        if "_activation" in self.__dict__:
+            summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
