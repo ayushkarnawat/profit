@@ -25,7 +25,7 @@ class LSTMLayer(nn.Module):
         during each training step.
     """
 
-    def __init__(self, input_size: int, hidden_size: int, dropout: float=0.):
+    def __init__(self, input_size: int=128, hidden_size: int=1024, dropout: float=0.):
         # Define all nodes in this module/layer
         super(LSTMLayer, self).__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
@@ -64,3 +64,11 @@ class LSTMPooler(nn.Module):
         pooled_output = self.dense(pooled_output)
         pooled_output = self.activation(pooled_output)
         return pooled_output
+
+
+class LSTMEncoder(nn.Module):
+    """"""
+
+    def __init__(self):
+        super(LSTMEncoder, self).__init__()
+        
