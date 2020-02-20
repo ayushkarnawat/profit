@@ -5,7 +5,7 @@ determines the shape of the tensors after the forward pass is complete?
 This can be useful for defining the current layer's shape (similar to 
 keras's `output_shape()` function).
 TODO: Remove note that the `forward()` function assumes that the num  
-samples are always channels_first. Change to support channels_last?
+samples are always batch_first. Change to support batch_last?
 
 References:
 - Three-Dimensionally Embedded Graph Convolutional Network
@@ -149,8 +149,8 @@ class GraphConvS(nn.Module):
         scalar_feats_1, scalar_feats_2, adjacency = inputs
 
         # Get parameters
-        # NOTE: Assuming that the num_samples are in channels_first. 
-        # Change to support channels_last?
+        # NOTE: Assuming that the num_samples are in batch_first. 
+        # Change to support batch_last?
         N = int(scalar_feats_1.shape[1])    # max number of atoms
         M1 = int(scalar_feats_1.shape[-1])  # num of features in s_1
         M2 = int(scalar_feats_2.shape[-1])  # num of features in s_2
@@ -321,8 +321,8 @@ class GraphConvV(nn.Module):
         vector_feats_1, vector_feats_2, adjacency = inputs
 
         # Get parameters
-        # NOTE: Assuming that the num_samples are in channels_first. 
-        # Change to support channels_last?
+        # NOTE: Assuming that the num_samples are in batch_first. 
+        # Change to support batch_last?
         N = int(vector_feats_1.shape[1])    # max number of atoms
         M1 = int(vector_feats_1.shape[-1])  # num of features in V_1
         M2 = int(vector_feats_2.shape[-1])  # num of features in V_2
@@ -406,8 +406,8 @@ class GraphEmbed(nn.Module):
         sfeats, distances = inputs
 
         # Get parameters
-        # NOTE: Assuming that the num_samples are in channels_first. 
-        # Change to support channels_last?
+        # NOTE: Assuming that the num_samples are in batch_first. 
+        # Change to support batch_last?
         max_atoms = int(sfeats.shape[1])
         num_atom_feats = int(sfeats.shape[-1])
         coor_dims = int(distances.shape[-1])
@@ -486,8 +486,8 @@ class GraphGather(nn.Module):
         scalar_features, vector_features = inputs
 
         # Get parameters
-        # NOTE: Assuming that the num_samples are in channels_first. 
-        # Change to support channels_last?
+        # NOTE: Assuming that the num_samples are in batch_first. 
+        # Change to support batch_last?
         coor_dims = int(vector_features.shape[2])
         atom_feat = int(vector_features.shape[-1])
 
@@ -627,8 +627,8 @@ class GraphSToS(nn.Module):
         scalar_features = inputs
 
         # Get parameters
-        # NOTE: Assuming that the num_samples are in channels_first. 
-        # Change to support channels_last? 
+        # NOTE: Assuming that the num_samples are in batch_first. 
+        # Change to support batch_last? 
         max_atoms = int(scalar_features.shape[1])
         atom_feat = int(scalar_features.shape[-1])
 

@@ -143,7 +143,7 @@ class SDFFileParser(BaseFileParser):
         # dims, if necessary. NOTE: The num of examples in the dataset depends 
         # on the data_format specified (represented by first/last channel).
         all_feats = [broadcast_array(feature) for feature in features] if features else []
-        if P.data_format() == "channels_last":
+        if P.data_format() == "batch_last":
             all_feats = [np.moveaxis(feat, 0, -1) for feat in all_feats]
         all_smiles = np.array(smiles_list) if return_smiles else None
         is_successful = np.array(is_successful_list) if return_is_successful else None

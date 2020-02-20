@@ -48,7 +48,7 @@ if os.path.exists(_config_path):
     _backend = _config.get('backend', _BACKEND)
     assert _backend in {'pytorch', 'tensorflow'}
     _data_format = _config.get('data_format', data_format())
-    assert _data_format in {'channels_last', 'channels_first'}
+    assert _data_format in {'batch_last', 'batch_first'}
 
     set_data_format(_data_format)
     _BACKEND = _backend

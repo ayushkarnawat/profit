@@ -100,7 +100,7 @@ class HDF5Serializer(InMemorySerializer):
         with h5py.File(path, "w") as h5file:
             # Check for same num of examples in the multiple ndarray's
             shapes = [arr.shape for arr in data]
-            axis = 0 if P.data_format() == "channels_first" else -1
+            axis = 0 if P.data_format() == "batch_first" else -1
             num_examples = [shape[axis] for shape in shapes]
             if num_examples[1:] != num_examples[:-1]:
                 raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
@@ -115,7 +115,7 @@ class HDF5Serializer(InMemorySerializer):
                 # which array it is referencing. Additionally, each ndarray has 
                 # to be converted to lists of lists for proper storage.
                 example = {f"arr_{i}": arr[idx].tolist() if P.data_format() == \
-                    "channels_first" else arr[...,idx].tolist() for i,arr in enumerate(data)}
+                    "batch_first" else arr[...,idx].tolist() for i,arr in enumerate(data)}
                 key = u'{:08}'.format(idx).encode('ascii')
 
                 # Convert dict to str so that json.loads() can recover 
@@ -146,14 +146,14 @@ class HDF5Serializer(InMemorySerializer):
         """
         if as_numpy:
             dataset_dict = {}
-            axis = 0 if P.data_format() == "channels_first" else -1
+            axis = 0 if P.data_format() == "batch_first" else -1
             with h5py.File(path, "r") as h5file:
                 for key in list(h5file.keys()):
                     example = json.loads(h5file.get(key)[()])
                     for name, arr in example.items():
                         arr = np.array(arr)
                         newshape = [1] + list(arr.shape) if P.data_format() == \
-                            "channels_first" else list(arr.shape) + [1]
+                            "batch_first" else list(arr.shape) + [1]
                         reshaped = np.reshape(arr, newshape=newshape)
                         # Concatenate individual examples together into one ndarray.
                         if name not in dataset_dict.keys():
@@ -196,7 +196,7 @@ class LMDBSerializer(LazySerializer):
 
         # Check for same num of examples in the multiple ndarray's
         shapes = [arr.shape for arr in data]
-        axis = 0 if P.data_format() == "channels_first" else -1
+        axis = 0 if P.data_format() == "batch_first" else -1
         num_examples = [shape[axis] for shape in shapes]
         if num_examples[1:] != num_examples[:-1]:
             raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
@@ -239,7 +239,7 @@ class LMDBSerializer(LazySerializer):
         n_examples = num_examples[0]
         txn = db.begin(write=True)
         for idx in tqdm(range(n_examples), total=n_examples):
-            example = {f"arr_{i}":arr[idx].tolist() if P.data_format() == "channels_first" 
+            example = {f"arr_{i}":arr[idx].tolist() if P.data_format() == "batch_first" 
                        else arr[...,idx].tolist() for i,arr in enumerate(data)}
             txn = put_or_grow(txn, key=u'{:08}'.format(idx).encode('ascii'), 
                               value=pkl.dumps(example, protocol=-1))
@@ -295,14 +295,14 @@ class LMDBSerializer(LazySerializer):
         if as_numpy:
             db = lmdb.open(path, subdir=isdir, readonly=True)
             dataset_dict = {}
-            axis = 0 if P.data_format() == "channels_first" else -1
+            axis = 0 if P.data_format() == "batch_first" else -1
             with db.begin() as txn, txn.cursor() as cursor:
                 for key in pkl.loads(cursor.get(b"__keys__")):
                     example = pkl.loads(cursor.get(key))
                     for name, arr in example.items():
                         arr = np.array(arr)
                         newshape = [1] + list(arr.shape) if P.data_format() == \
-                            "channels_first" else list(arr.shape) + [1]
+                            "batch_first" else list(arr.shape) + [1]
                         reshaped = np.reshape(arr, newshape=newshape)
                         # Concatenate individual examples together into one ndarray.
                         if name not in dataset_dict.keys():
@@ -346,7 +346,7 @@ class NumpySerializer(InMemorySerializer):
 
         # Check for same num of examples in the multiple ndarray's
         shapes = [arr.shape for arr in data]
-        axis = 0 if P.data_format() == "channels_first" else -1
+        axis = 0 if P.data_format() == "batch_first" else -1
         num_examples = [shape[axis] for shape in shapes]
         if num_examples[1:] != num_examples[:-1]:
             raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
@@ -362,7 +362,7 @@ class NumpySerializer(InMemorySerializer):
             # which array it is referencing. Additionally, each ndarray is  
             # converted to lists of lists to save storage space.
             example = {f"arr_{i}": arr[idx].tolist() if P.data_format() == \
-                "channels_first" else arr[...,idx].tolist() for i,arr in enumerate(data)}
+                "batch_first" else arr[...,idx].tolist() for i,arr in enumerate(data)}
             key = u'{:08}'.format(idx)
             dataset_dict[key] = pkl.dumps(example, protocol=-1)
 
@@ -394,14 +394,14 @@ class NumpySerializer(InMemorySerializer):
         """
         if as_numpy:
             dataset_dict = {}
-            axis = 0 if P.data_format() == "channels_first" else -1
+            axis = 0 if P.data_format() == "batch_first" else -1
             with np.load(path, allow_pickle=False) as npzfile:
                 for key in list(npzfile.keys()):
                     example = pkl.loads(npzfile.get(key))
                     for name, arr in example.items():
                         arr = np.array(arr)
                         newshape = [1] + list(arr.shape) if P.data_format() == \
-                            "channels_first" else list(arr.shape) + [1]
+                            "batch_first" else list(arr.shape) + [1]
                         reshaped = np.reshape(arr, newshape=newshape)
                         # Concatenate individual examples together into one ndarray.
                         if name not in dataset_dict.keys():
@@ -510,7 +510,7 @@ class TFRecordsSerializer(LazySerializer):
 
         # Check for same num of examples in the multiple ndarray's
         shapes = [arr.shape for arr in data]
-        axis = 0 if P.data_format() == "channels_first" else -1
+        axis = 0 if P.data_format() == "batch_first" else -1
         num_examples = [shape[axis] for shape in shapes]
         if num_examples[1:] != num_examples[:-1]:
             raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
@@ -518,7 +518,7 @@ class TFRecordsSerializer(LazySerializer):
 
         # Add shapes of each array in the dataset (for a single example). Hack 
         # to allow serialized data to be reshaped properly when loaded.
-        shapes = {f"shape_{idx}": np.array(arr.shape[1:]) if P.data_format() == "channels_first" 
+        shapes = {f"shape_{idx}": np.array(arr.shape[1:]) if P.data_format() == "batch_first" 
                   else np.array(arr.shape[:-1]) for idx, arr in enumerate(data)}
         dataset = {f"arr_{idx}": arr for idx, arr in enumerate(data)}
         dataset.update(shapes)
@@ -537,7 +537,7 @@ class TFRecordsSerializer(LazySerializer):
                         example[key] = {"data": arr, "_type": _int64_feature}
                     else:
                         example[key] = {"data": arr[row].tobytes() if P.data_format() \
-                            == "channels_first" else arr[...,row].tobytes(), 
+                            == "batch_first" else arr[...,row].tobytes(), 
                                         "_type": _bytes_feature}
                 writer.write(_serialize(example))
 
@@ -577,7 +577,7 @@ class TFRecordsSerializer(LazySerializer):
         # Parse serialized records into correctly shaped tensors/ndarray's
         if as_numpy:
             dataset_dict = {}
-            axis = 0 if P.data_format() == "channels_first" else -1
+            axis = 0 if P.data_format() == "batch_first" else -1
             for serialized in tf.python_io.tf_record_iterator(path):
                 example = tf.train.Example()
                 example.ParseFromString(serialized)
@@ -589,7 +589,7 @@ class TFRecordsSerializer(LazySerializer):
                         parsed_data = np.frombuffer(tf_feature.bytes_list.value[0], np.float)
                         newshape = shapes.get("shape_{}".format(name.split("_")[-1]))
                         newshape = [1] + newshape if P.data_format() == \
-                            "channels_first" else newshape + [1]
+                            "batch_first" else newshape + [1]
                         reshaped = np.reshape(parsed_data, newshape=newshape)
                         # Concatenate individual examples together into one ndarray.
                         if name not in dataset_dict.keys():

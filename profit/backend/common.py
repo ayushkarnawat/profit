@@ -3,7 +3,7 @@ from __future__ import print_function
 
 
 # Type of float to use throughout the session.
-_DATA_FORMAT = 'channels_first'
+_DATA_FORMAT = 'batch_first'
 
 
 def data_format() -> str:
@@ -12,13 +12,13 @@ def data_format() -> str:
     Returns:
     -------
     format: str
-        A string, either `'channels_first'` or `'channels_last'`.
+        A string, either `'batch_first'` or `'batch_last'`.
 
     Example:
     --------
     ```python
     >>> profit.backend.data_format()
-    'channels_first'
+    'batch_first'
     ```
     """
     return _DATA_FORMAT
@@ -30,20 +30,20 @@ def set_data_format(data_format: str):
     Params:
     -------
     data_format: str
-        Either `'channels_first'` or `'channels_last'`.
+        Either `'batch_first'` or `'batch_last'`.
 
     Example:
     --------
     ```python
     >>> from profit import backend as P
     >>> P.data_format()
-    'channels_first'
-    >>> P.set_data_format('channels_last')
+    'batch_first'
+    >>> P.set_data_format('batch_last')
     >>> P.data_format()
-    'channels_last'
+    'batch_last'
     ```
     """
     global _DATA_FORMAT
-    if data_format not in {'channels_last', 'channels_first'}:
+    if data_format not in {'batch_last', 'batch_first'}:
         raise ValueError('Unknown data_format:', data_format)
     _DATA_FORMAT = str(data_format)
