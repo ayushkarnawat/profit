@@ -12,4 +12,7 @@ https://www.biorxiv.org/content/biorxiv/early/2019/03/26/589333.full.pdf
 """
 
 from profit.models import gcn
+from profit.models import gcn_pytorch
+
 from profit.models.gcn import GCN
+from profit.models.gcn_pytorch import Torch3DGCN

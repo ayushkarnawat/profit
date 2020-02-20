@@ -1,5 +1,12 @@
 """Three-dimensional graph convolution network (GCN).
 
+TODO: Should each module contain a `output_shape()` function which 
+determines the shape of the tensors after the forward pass is complete? 
+This can be useful for defining the current layer's shape (similar to 
+keras's `output_shape()` function).
+TODO: Remove note that the `forward()` function assumes that the num  
+samples are always channels_first. Change to support channels_last?
+
 References:
 - Three-Dimensionally Embedded Graph Convolutional Network
 - Paper: https://arxiv.org/abs/1811.09794
@@ -1053,3 +1060,80 @@ class GraphVToV(nn.Module):
         if "_activation" in self.__dict__:
             summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
+
+
+class Torch3DGCN(nn.Module):
+    """Assuming regression task. 
+    
+    TODO: Add L1/L2 regularizer for weight kernel on fully connected layers?
+    """
+
+    def __init__(self, num_atoms, num_feats, num_outputs, num_layers, units_conv, units_dense):
+        super(Torch3DGCN, self).__init__()
+        self.num_atoms = num_atoms
+        self.num_feats = num_feats
+        self.num_outputs = num_outputs
+        self.num_layers = num_layers
+
+        # Activations
+        self.relu = nn.ReLU()
+        self.tanh = nn.Tanh()
+
+        # Input layer
+        self.embed = GraphEmbed()
+        # Hidden layers
+        self.hidden_layers = nn.ModuleDict()
+        self.hidden_layers["s_to_s_0"] = GraphSToS(2*num_feats, units_conv, activation=self.relu)
+        self.hidden_layers["v_to_s_0"] = GraphVToS(2*num_feats, units_conv, activation=self.relu)
+        self.hidden_layers["s_to_v_0"] = GraphSToV(2*num_feats, units_conv, activation=self.tanh)
+        self.hidden_layers["v_to_v_0"] = GraphVToV(2*num_feats, units_conv, activation=self.tanh)
+        for i in range(1, num_layers):
+            self.hidden_layers[f's_to_s_{i}'] = GraphSToS(2*units_conv, units_conv, activation=self.relu)
+            self.hidden_layers[f'v_to_s_{i}'] = GraphVToS(2*units_conv, units_conv, activation=self.relu)
+            self.hidden_layers[f's_to_v_{i}'] = GraphSToV(2*units_conv, units_conv, activation=self.relu)
+            self.hidden_layers[f'v_to_v_{i}'] = GraphVToV(2*units_conv, units_conv, activation=self.relu)
+        self.conv_s = GraphConvS(2*units_conv, units_conv, pooling="sum", activation=self.relu)
+        self.conv_v = GraphConvV(2*units_conv, units_conv, pooling="sum", activation=self.tanh)
+        # Gather layer
+        self.gather = GraphGather(pooling="max")
+        # Fully connected layers
+        # NOTE: Applies dense connected layer to each coord (dim=1) of vector features (sample, coord_dim, n_filters/atom_feats)
+        self.s_dense = nn.Linear(units_dense, units_dense)
+        self.v_dense = nn.Linear(units_dense, units_dense)
+        # Flatten layer
+        self.flatten = nn.Flatten()
+        # Output layer
+        # NOTE: 3*units_dense for vector (since we flattened it) + units_dense from scalar = 512 total
+        self.out = nn.Linear(3*units_dense+units_dense, num_outputs)
+
+
+    def forward(self, inputs) -> torch.Tensor:
+        # Input tensors
+        # atoms = (samples, num_atoms, num_feats)
+        # adjms = (samples, num_atoms, num_atoms)
+        # dists = (samples, num_atoms, num_atoms, 3)
+        atoms, adjms, dists = inputs
+
+        sc, vc = self.embed([atoms, dists])
+        for i in range(self.num_layers):
+            sc_s = self.hidden_layers[f"s_to_s_{i}"](sc)
+            sc_v = self.hidden_layers[f"v_to_s_{i}"]([vc, dists])
+            vc_s = self.hidden_layers[f"s_to_v_{i}"]([sc, dists])
+            vc_v = self.hidden_layers[f"v_to_v_{i}"](vc)
+            sc = self.conv_s([sc_s, sc_v, adjms])
+            vc = self.conv_v([vc_s, vc_v, adjms])
+        sc, vc = self.gather([sc, vc])
+
+        # apply relu activation to linear/dense unit(s)
+        sc_out = self.relu(self.s_dense(sc))
+        sc_out = self.relu(self.s_dense(sc_out))
+        vc_out = self.relu(self.v_dense(vc))
+        vc_out = self.relu(self.v_dense(vc_out))
+        vc_out = self.flatten(vc_out)
+
+        concat = torch.cat((sc_out, vc_out), dim=-1) # concatenate along last dimension
+        return self.out(concat) # linear activation for regression task
+
+
+    def extra_repr(self) -> str:
+        pass
