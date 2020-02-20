@@ -1,11 +1,10 @@
-"""
-[WIP]: Need to implement both convolutions for vectors and scalars, a 
-graph embed layer, gather layer, and nodes layer.
-[WIP]: How to incorporate bayesian optimization/combinatorial search 
-within the graphical network??? NOTE: Each call to bayesian opt is 
-expensive (since it is "online" learning).
+"""Three-dimensional graph convolution network (GCN).
 
-Adapated from: https://git.io/Jv49v, https://git.io/Jv49t, https://git.io/Jv4AZ
+References:
+- Three-Dimensionally Embedded Graph Convolutional Network
+- Paper: https://arxiv.org/abs/1811.09794
+- Code: https://github.com/blackmints/3DGCN
+- Adapted from: https://git.io/Jv49v
 """
 
 import inspect
@@ -37,8 +36,11 @@ class GraphConvS(nn.Module):
 
     Params:
     -------
-    n_filters: int
-        The number of filters/kernels to use.
+    in_feats: int
+        Input feature size.
+
+    out_feats: int
+        Output feature size (aka num of filters/kernels).
 
     pooling: str, optional, default="sum"
         Type of down-sample pooling technique to perform on the hidden 
@@ -64,14 +66,17 @@ class GraphConvS(nn.Module):
     """
 
     def __init__(self, 
-                 n_filters: int, 
+                 in_feats: int, 
+                 out_feats: int, 
                  pooling: str="sum", 
                  bias: bool=True, 
                  activation: Optional[Activations]=None):
         super(GraphConvS, self).__init__()
 
-        assert n_filters > 0, f"Number of filters (N={n_filters}) must be greater than 0."
-        self._n_filters = n_filters
+        assert in_feats > 0, f"Number of input feats (N={in_feats}) must be greater than 0."
+        assert out_feats > 0, f"Number of output feats (N={out_feats}) must be greater than 0."
+        self._in_feats = in_feats
+        self._out_feats = out_feats
         self._pooling = pooling
         if activation is not None:
             assert isinstance(activation, tuple(activations)), f"Invalid " 
@@ -79,13 +84,10 @@ class GraphConvS(nn.Module):
             f"following: {activations}."
         self._activation = activation
 
-        # Add learnable weight/bias params to the layer.
-        # NOTE: The in_feats, out_feats should be computed via the shapes of the previous layers.
-        # TODO: Dummy values, remove
-        in_feats = 10
-        self.weight = nn.Parameter(Tensor(in_feats, n_filters), requires_grad=True)
+        # Add learnable weight/bias params to the layer
+        self.weight = nn.Parameter(Tensor(in_feats, out_feats), requires_grad=True)
         if bias:
-            self.bias = nn.Parameter(Tensor(n_filters))
+            self.bias = nn.Parameter(Tensor(out_feats))
         else:
             self.register_parameter('bias', None)
         self.reset_parameters() # init weights for 1st optim step
@@ -182,7 +184,8 @@ class GraphConvS(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = "n_filters={_n_filters}, pooling={_pooling}"
+        summary = "in_feats={_in_feats}, out_feats={_out_feats}"
+        summary += ", pooling={_pooling}"
         if "_activation" in self.__dict__:
             summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
@@ -205,8 +208,11 @@ class GraphConvV(nn.Module):
 
     Params:
     -------
-    n_filters: int
-        The number of filters/kernels to use.
+    in_feats: int
+        Input feature size.
+
+    out_feats: int
+        Output feature size (aka num of filters/kernels).
 
     pooling: str, optional, default="sum"
         Type of down-sample pooling technique to perform on the hidden 
@@ -232,14 +238,17 @@ class GraphConvV(nn.Module):
     """
 
     def __init__(self, 
-                 n_filters: int, 
+                 in_feats: int,
+                 out_feats: int, 
                  pooling: str="sum", 
                  bias: bool=True, 
                  activation: Optional[Activations]=None):
         super(GraphConvV, self).__init__()
 
-        assert n_filters > 0, f"Number of filters (N={n_filters}) must be greater than 0."
-        self._n_filters = n_filters
+        assert in_feats > 0, f"Number of input feats (N={in_feats}) must be greater than 0."
+        assert out_feats > 0, f"Number of output feats (N={out_feats}) must be greater than 0."
+        self._in_feats = in_feats
+        self._out_feats = out_feats
         self._pooling = pooling
         if activation is not None:
             assert isinstance(activation, tuple(activations)), f"Invalid " 
@@ -247,13 +256,10 @@ class GraphConvV(nn.Module):
             f"following: {activations}."
         self._activation = activation
 
-        # Add learnable weight/bias params to the layer.
-        # NOTE: The in_feats, out_feats should be computed via the shapes of the previous layers.
-        # TODO: Dummy values, remove
-        in_feats = 10
-        self.weight = nn.Parameter(Tensor(in_feats, n_filters), requires_grad=True)
+        # Add learnable weight/bias params to the layer
+        self.weight = nn.Parameter(Tensor(in_feats, out_feats), requires_grad=True)
         if bias:
-            self.bias = nn.Parameter(Tensor(n_filters))
+            self.bias = nn.Parameter(Tensor(out_feats))
         else:
             self.register_parameter('bias', None)
         self.reset_parameters() # init weights for 1st optim step
@@ -351,7 +357,8 @@ class GraphConvV(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = "n_filters={_n_filters}, pooling={_pooling}"
+        summary = "in_feats={_in_feats}, out_feats={_out_feats}"
+        summary += ", pooling={_pooling}"
         if "_activation" in self.__dict__:
             summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
@@ -518,13 +525,13 @@ class GraphGather(nn.Module):
 
     def extra_repr(self) -> str:
         """String representation of the module. 
-        
+
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
         summary = "pooling={_pooling}, coord_system={_system}"
         if "_activation" in self.__dict__:
-            summary += "", activation={_activation}"
+            summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
 
 
@@ -533,8 +540,11 @@ class GraphSToS(nn.Module):
 
     Params:
     -------
-    n_filters: int
-        The number of filters/kernels to use.
+    in_feats: int
+        Input feature size.
+
+    out_feats: int
+        Output feature size (aka num of filters/kernels).
 
     bias: bool, default=True
         If True, adds a learnable bias to the convolved output.
@@ -553,12 +563,17 @@ class GraphSToS(nn.Module):
         The learnable bias tensor.
     """
 
-    def __init__(self, n_filters: int, bias: bool=True, 
+    def __init__(self, 
+                 in_feats: int, 
+                 out_feats: int, 
+                 bias: bool=True, 
                  activation: Optional[Activations]=None):
         super(GraphSToS, self).__init__()
 
-        assert n_filters > 0, f"Number of filters (N={n_filters}) must be greater than 0."
-        self._n_filters = n_filters
+        assert in_feats > 0, f"Number of input feats (N={in_feats}) must be greater than 0."
+        assert out_feats > 0, f"Number of output feats (N={out_feats}) must be greater than 0."
+        self._in_feats = in_feats
+        self._out_feats = out_feats
 
         if activation is not None:
             assert isinstance(activation, tuple(activations)), f"Invalid " 
@@ -566,13 +581,10 @@ class GraphSToS(nn.Module):
             f"following: {activations}."
         self._activation = activation
 
-        # Add learnable weight/bias params to the layer.
-        # NOTE: The in_feats, out_feats should be computed via the shapes of the previous layers.
-        # TODO: Dummy values, remove
-        in_feats = 10
-        self.weight = nn.Parameter(Tensor(in_feats, n_filters), requires_grad=True)
+        # Add learnable weight/bias params to the layer
+        self.weight = nn.Parameter(Tensor(in_feats, out_feats), requires_grad=True)
         if bias:
-            self.bias = nn.Parameter(Tensor(n_filters))
+            self.bias = nn.Parameter(Tensor(out_feats))
         else:
             self.register_parameter('bias', None)
         self.reset_parameters() # init weights for 1st optim step
@@ -641,7 +653,7 @@ class GraphSToS(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = "n_filters={_n_filters}"
+        summary = "in_feats={_in_feats}, out_feats={_out_feats}"
         if "_activation" in self.__dict__:
             summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
@@ -652,8 +664,11 @@ class GraphSToV(nn.Module):
 
     Params:
     -------
-    n_filters: int
-        The number of filters/kernels to use.
+    in_feats: int
+        Input feature size.
+
+    out_feats: int
+        Output feature size (aka num of filters/kernels).
 
     bias: bool, default=True
         If True, adds a learnable bias to the convolved output.
@@ -672,12 +687,17 @@ class GraphSToV(nn.Module):
         The learnable bias tensor.
     """
 
-    def __init__(self, n_filters: int, bias: bool=True, 
+    def __init__(self, 
+                 in_feats: int, 
+                 out_feats: int, 
+                 bias: bool=True, 
                  activation: Optional[Activations]=None):
         super(GraphSToV, self).__init__()
 
-        assert n_filters > 0, f"Number of filters (N={n_filters}) must be greater than 0."
-        self._n_filters = n_filters
+        assert in_feats > 0, f"Number of input feats (N={in_feats}) must be greater than 0."
+        assert out_feats > 0, f"Number of output feats (N={out_feats}) must be greater than 0."
+        self._in_feats = in_feats
+        self._out_feats = out_feats
 
         if activation is not None:
             assert isinstance(activation, tuple(activations)), f"Invalid " 
@@ -685,13 +705,10 @@ class GraphSToV(nn.Module):
             f"following: {activations}."
         self._activation = activation
 
-        # Add learnable weight/bias params to the layer.
-        # NOTE: The in_feats, out_feats should be computed via the shapes of the previous layers.
-        # TODO: Dummy values, remove
-        in_feats = 10
-        self.weight = nn.Parameter(Tensor(in_feats, n_filters), requires_grad=True)
+        # Add learnable weight/bias params to the layer
+        self.weight = nn.Parameter(Tensor(in_feats, out_feats), requires_grad=True)
         if bias:
-            self.bias = nn.Parameter(Tensor(n_filters))
+            self.bias = nn.Parameter(Tensor(out_feats))
         else:
             self.register_parameter('bias', None)
         self.reset_parameters() # init weights for 1st optim step
@@ -769,7 +786,7 @@ class GraphSToV(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = "n_filters={_n_filters}"
+        summary = "in_feats={_in_feats}, out_feats={_out_feats}"
         if "_activation" in self.__dict__:
             summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
@@ -780,8 +797,11 @@ class GraphVToS(nn.Module):
 
     Params:
     -------
-    n_filters: int
-        The number of filters/kernels to use.
+    in_feats: int
+        Input feature size.
+
+    out_feats: int
+        Output feature size (aka num of filters/kernels).
 
     bias: bool, default=True
         If True, adds a learnable bias to the convolved output.
@@ -800,12 +820,17 @@ class GraphVToS(nn.Module):
         The learnable bias tensor.
     """
 
-    def __init__(self, n_filters: int, bias: bool=True, 
+    def __init__(self, 
+                 in_feats: int, 
+                 out_feats: int, 
+                 bias: bool=True, 
                  activation: Optional[Activations]=None):
         super(GraphVToS, self).__init__()
 
-        assert n_filters > 0, f"Number of filters (N={n_filters}) must be greater than 0."
-        self._n_filters = n_filters
+        assert in_feats > 0, f"Number of input feats (N={in_feats}) must be greater than 0."
+        assert out_feats > 0, f"Number of output feats (N={out_feats}) must be greater than 0."
+        self._in_feats = in_feats
+        self._out_feats = out_feats
 
         if activation is not None:
             assert isinstance(activation, tuple(activations)), f"Invalid " 
@@ -813,13 +838,10 @@ class GraphVToS(nn.Module):
             f"following: {activations}."
         self._activation = activation
 
-        # Add learnable weight/bias params to the layer.
-        # NOTE: The in_feats, out_feats should be computed via the shapes of the previous layers.
-        # TODO: Dummy values, remove
-        in_feats = 10
-        self.weight = nn.Parameter(Tensor(in_feats, n_filters), requires_grad=True)
+        # Add learnable weight/bias params to the layer
+        self.weight = nn.Parameter(Tensor(in_feats, out_feats), requires_grad=True)
         if bias:
-            self.bias = nn.Parameter(Tensor(n_filters))
+            self.bias = nn.Parameter(Tensor(out_feats))
         else:
             self.register_parameter('bias', None)
         self.reset_parameters() # init weights for 1st optim step
@@ -903,7 +925,7 @@ class GraphVToS(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = "n_filters={_n_filters}"
+        summary = "in_feats={_in_feats}, out_feats={_out_feats}"
         if "_activation" in self.__dict__:
             summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
@@ -914,8 +936,11 @@ class GraphVtoV(nn.Module):
 
     Params:
     -------
-    n_filters: int
-        The number of filters/kernels to use.
+    in_feats: int
+        Input feature size.
+
+    out_feats: int
+        Output feature size (aka num of filters/kernels).
 
     bias: bool, default=True
         If True, adds a learnable bias to the convolved output.
@@ -934,12 +959,17 @@ class GraphVtoV(nn.Module):
         The learnable bias tensor.
     """
 
-    def __init__(self, n_filters: int, bias: bool=True, 
+    def __init__(self, 
+                 in_feats: int, 
+                 out_feats: int, 
+                 bias: bool=True, 
                  activation: Optional[Activations]=None):
         super(GraphVToV, self).__init__()
 
-        assert n_filters > 0, f"Number of filters (N={n_filters}) must be greater than 0."
-        self._n_filters = n_filters
+        assert in_feats > 0, f"Number of input feats (N={in_feats}) must be greater than 0."
+        assert out_feats > 0, f"Number of output feats (N={out_feats}) must be greater than 0."
+        self._in_feats = in_feats
+        self._out_feats = out_feats
 
         if activation is not None:
             assert isinstance(activation, tuple(activations)), f"Invalid " 
@@ -947,13 +977,10 @@ class GraphVtoV(nn.Module):
             f"following: {activations}."
         self._activation = activation
 
-        # Add learnable weight/bias params to the layer.
-        # NOTE: The in_feats, out_feats should be computed via the shapes of the previous layers.
-        # TODO: Dummy values, remove
-        in_feats = 10
-        self.weight = nn.Parameter(Tensor(in_feats, n_filters), requires_grad=True)
+        # Add learnable weight/bias params to the layer
+        self.weight = nn.Parameter(Tensor(in_feats, out_feats), requires_grad=True)
         if bias:
-            self.bias = nn.Parameter(Tensor(n_filters))
+            self.bias = nn.Parameter(Tensor(out_feats))
         else:
             self.register_parameter('bias', None)
         self.reset_parameters() # init weights for 1st optim step
@@ -1022,7 +1049,7 @@ class GraphVtoV(nn.Module):
         Sets the extra representation, which comes into effect when 
         printing the (full) model summary.
         """
-        summary = "n_filters={_n_filters}"
+        summary = "in_feats={_in_feats}, out_feats={_out_feats}"
         if "_activation" in self.__dict__:
             summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
