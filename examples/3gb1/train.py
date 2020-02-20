@@ -2,12 +2,12 @@ import numpy as np
 import tensorflow as tf
 
 from data import load_dataset
-from profit.models.gcn import GCN
+from profit.models.tensorflow.egcn import EmbeddedGCN
 from profit.dataset.splitters import split_method_dict
 
 
 # Preprocess + load the dataset
-data = load_dataset('gcn', 'tertiary', labels='Fitness', num_data=10, \
+data = load_dataset('egcn', 'tertiary', labels='Fitness', num_data=10, \
     filetype='tfrecords', as_numpy=True)
 
 # Shuffle, split and batch
@@ -26,7 +26,7 @@ train_y = train_data[-1]
 val_X = val_data[:-1]
 val_y = val_data[-1]
 
-# Initialize GCN model (really hacky), it also assumes we have the data loaded 
+# Initialize eGCN model (really hacky), it also assumes we have the data loaded 
 # in memory, which is the wrong approach. Instead, we should peek into the 
 # shape defined in the TF tensors.
 
@@ -37,7 +37,7 @@ num_atoms, num_feats = train_data[0].shape[1], train_data[0].shape[2]
 labels = train_data[-1]
 num_outputs = labels.shape[1]
 labels_std = np.std(labels, axis=0)
-model = GCN(num_atoms, num_feats, num_outputs=num_outputs, std=labels_std).get_model()
+model = EmbeddedGCN(num_atoms, num_feats, num_outputs=num_outputs, std=labels_std).get_model()
 
 # Fit model and report metrics
 model.fit(train_X, train_y, batch_size=5, epochs=3, shuffle=True, 
@@ -46,19 +46,19 @@ model.fit(train_X, train_y, batch_size=5, epochs=3, shuffle=True,
 
 # # DEBUG PyTorch version
 # from torch.utils.data import DataLoader
-# from profit.models.gcn_pytorch import Torch3DGCN
+# from profit.models.pytorch.egcn import EmbeddedGCN
 # from profit.utils.data_utils.serializers import LMDBSerializer
 
 # # Load data
-# data = LMDBSerializer.load('data/3gb1/processed/gcn_fitness/tertiary3.mdb', as_numpy=False)
+# data = LMDBSerializer.load('data/3gb1/processed/egcn_fitness/tertiary3.mdb', as_numpy=False)
 
 # # Init model
 # num_atoms, num_feats = data[0]['arr_0'].shape
-# gcn = Torch3DGCN(num_atoms, num_feats, num_outputs=1, num_layers=2, units_conv=128, units_dense=128)
+# model = EmbeddedGCN(num_atoms, num_feats, num_outputs=1, num_layers=2, units_conv=128, units_dense=128)
 
 # # Batch dataset
 # loader = DataLoader(data, batch_size=2)
 # for batch in loader:
 #     atoms, adjms, dists, labels = batch.values()
-#     out = gcn([atoms, adjms, dists])
+#     out = model([atoms, adjms, dists])
 #     print(out)

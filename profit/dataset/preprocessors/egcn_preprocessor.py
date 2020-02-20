@@ -10,8 +10,8 @@ from profit.dataset.preprocessing.mol_feats import construct_pos_matrix
 from profit.dataset.preprocessors.mol_preprocessor import MolPreprocessor
 
 
-class GCNPreprocessor(MolPreprocessor):
-    """Graph Convolution Neural Network (GCN) processor.
+class EGCNPreprocessor(MolPreprocessor):
+    """Embedded Graph Convolution Neural Network (eGCN) processor.
     
     Params:
     -------
@@ -33,7 +33,7 @@ class GCNPreprocessor(MolPreprocessor):
     
     def __init__(self, max_atoms: Optional[int]=-1, out_size: Optional[int]=-1, 
                  add_Hs: Optional[bool]=False, kekulize: Optional[bool]=True):
-        super(GCNPreprocessor, self).__init__(add_Hs=add_Hs, kekulize=kekulize)
+        super(EGCNPreprocessor, self).__init__(add_Hs=add_Hs, kekulize=kekulize)
 
         if max_atoms >= 0 and out_size >= 0 and max_atoms > out_size:
             raise ValueError('max_atoms (N={0:d}) must be less than or equal to out_size'

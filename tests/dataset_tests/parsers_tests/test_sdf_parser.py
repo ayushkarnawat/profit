@@ -6,8 +6,8 @@ import numpy as np
 from rdkit.Chem import rdDistGeom, rdmolfiles, rdmolops
 
 from profit.dataset.parsers.sdf_parser import SDFFileParser
-from profit.dataset.preprocessors.gcn_preprocessor import GCNPreprocessor
-from profit.utils.io import maybe_create_dir
+from profit.dataset.preprocessors.egcn_preprocessor import EGCNPreprocessor
+from profit.utils.io_utils import maybe_create_dir
 
 
 @pytest.fixture
@@ -38,7 +38,7 @@ def sdf_file(test_mols):
 
 
 def test_sdf_file_parser_not_return_smiles(sdf_file, test_mols):
-    preprocessor = GCNPreprocessor(max_atoms=49, out_size=49)
+    preprocessor = EGCNPreprocessor(max_atoms=49, out_size=49)
     parser = SDFFileParser(preprocessor)
     result = parser.parse(sdf_file, return_smiles=False)
     dataset = result['dataset']
@@ -54,7 +54,7 @@ def test_sdf_file_parser_not_return_smiles(sdf_file, test_mols):
 
 
 def test_sdf_file_parser_return_smiles(sdf_file, test_mols):
-    preprocessor = GCNPreprocessor(max_atoms=49, out_size=49)
+    preprocessor = EGCNPreprocessor(max_atoms=49, out_size=49)
     parser = SDFFileParser(preprocessor)
     result = parser.parse(sdf_file, return_smiles=True)
     dataset = result['dataset']
@@ -77,7 +77,7 @@ def test_sdf_file_parser_return_smiles(sdf_file, test_mols):
 
 def test_sdf_file_parser_target_index(sdf_file, test_mols):
     idxs = [0,2]
-    preprocessor = GCNPreprocessor(max_atoms=49, out_size=49)
+    preprocessor = EGCNPreprocessor(max_atoms=49, out_size=49)
     parser = SDFFileParser(preprocessor, labels='Fitness')
     result = parser.parse(sdf_file, return_smiles=True, target_index=idxs)
     dataset = result['dataset']
