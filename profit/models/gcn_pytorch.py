@@ -156,11 +156,11 @@ class GraphConvS(nn.Module):
         sfeats = torch.matmul(sfeats, self.weight)
         if self.bias is not None:
             sfeats = sfeats + self.bias
-        sfeats = torch.reshape(sfeats, shape=(-1, N, N, self.filters))
+        sfeats = torch.reshape(sfeats, shape=(-1, N, N, self._out_feats))
 
         # 3. Adjacency masking, 4D tensor
         adjacency = torch.reshape(adjacency, shape=(-1, N, N, 1))
-        adjacency = adjacency.repeat(1, 1, 1, self.filters)
+        adjacency = adjacency.repeat(1, 1, 1, self._out_feats)
         sfeats = torch.mul(sfeats, adjacency) # element-wise multiplication
 
         # 4. Integrate over second atom axis, 3D tensor
@@ -329,19 +329,19 @@ class GraphConvV(nn.Module):
         vfeats = torch.matmul(vfeats, self.weight)
         if self.bias is not None:
             vfeats = vfeats + self.bias
-        vfeats = torch.reshape(vfeats, shape=(-1, N, N, D, self.filters))
+        vfeats = torch.reshape(vfeats, shape=(-1, N, N, D, self._out_feats))
 
         # 3. Adjacency masking, 5D tensor
         adjacency = torch.reshape(adjacency, shape=(-1, N, N, 1, 1))
-        adjacency = adjacency.repeat(1, 1, 1, D, self.filters)
+        adjacency = adjacency.repeat(1, 1, 1, D, self._out_feats)
         vfeats = torch.mul(vfeats, adjacency) # element-wise multiplication
 
         # 4. Integrate over second atom axis, 4D tensor
-        if self.pooling == "sum":
+        if self._pooling == "sum":
             vfeats = torch.sum(vfeats, dim=2)
-        elif self.pooling == "mean":
+        elif self._pooling == "mean":
             vfeats = torch.mean(vfeats, dim=2)
-        elif self.pooling == "max":
+        elif self._pooling == "max":
             vfeats = torch.max(vfeats, dim=2)
 
         # 5. Activation, 4D tensor
@@ -638,7 +638,7 @@ class GraphSToS(nn.Module):
         scalar_features = torch.matmul(scalar_features, self.weight)
         if self.bias is not None:
             scalar_features = scalar_features + self.bias
-        scalar_features = torch.reshape(scalar_features, shape=(-1, max_atoms, max_atoms, self.filters))
+        scalar_features = torch.reshape(scalar_features, shape=(-1, max_atoms, max_atoms, self._out_feats))
 
         # 4. Activation, 4D tensor
         if self._activation is not None:
@@ -763,12 +763,12 @@ class GraphSToV(nn.Module):
         scalar_features = torch.matmul(scalar_features, self.weight)
         if self.bias is not None:
             scalar_features = scalar_features + self.bias
-        scalar_features = torch.reshape(scalar_features, shape=(-1, max_atoms, max_atoms, 1, self.filters))
+        scalar_features = torch.reshape(scalar_features, shape=(-1, max_atoms, max_atoms, 1, self._out_feats))
         scalar_features = scalar_features.repeat(1, 1, 1, coor_dims, 1)
 
         # 4. Expand relative distances, 5D tensor
         distances = torch.reshape(distances, shape=(-1, max_atoms, max_atoms, coor_dims, 1))
-        distances = distances.repeat(1, 1, 1, 1, self.filters)
+        distances = distances.repeat(1, 1, 1, 1, self._out_feats)
 
         # 5. Tensor product, element-wise multiplication
         vector_features = torch.mul(scalar_features, distances)
@@ -897,16 +897,16 @@ class GraphVToS(nn.Module):
         vector_features = torch.matmul(vector_features, self.weight)
         if self.bias is not None:
             vector_features = vector_features + self.bias
-        vector_features = torch.reshape(vector_features, shape=(-1, max_atoms, max_atoms, coor_dims, self.filters))
+        vector_features = torch.reshape(vector_features, shape=(-1, max_atoms, max_atoms, coor_dims, self._out_feats))
 
         # # 4. Calculate r^ = r / |r| and expand it to 5D
         # distances_hat = torch.sqrt(torch.sum(torch.square(distances), dim=-1, keepdim=True))
         # distances_hat = distances_hat + torch.eq(distances_hat, 0).type(torch.float)
         # distances_hat = torch.div(distances, distances_hat)
         # distances_hat = torch.reshape(distances_hat, shape=(-1, max_atoms, max_atoms, coor_dims, 1))
-        # distances_hat = distances_hat.repeat(1, 1, 1, 1, self.filters)
+        # distances_hat = distances_hat.repeat(1, 1, 1, 1, self._out_feats)
         distances_hat = torch.reshape(distances, shape=(-1, max_atoms, max_atoms, coor_dims, 1))
-        distances_hat = distances_hat.repeat(1, 1, 1, 1, self.filters)
+        distances_hat = distances_hat.repeat(1, 1, 1, 1, self._out_feats)
 
         # 5. Projection of v onto r = v (dot) r^
         scalar_features = torch.mul(vector_features, distances_hat)
@@ -914,7 +914,7 @@ class GraphVToS(nn.Module):
 
         # 6. Activation
         if self._activation is not None:
-            scalar_features = self.activation(scalar_features)
+            scalar_features = self._activation(scalar_features)
 
         return scalar_features
 
@@ -931,7 +931,7 @@ class GraphVToS(nn.Module):
         return summary.format(**self.__dict__)
 
 
-class GraphVtoV(nn.Module):
+class GraphVToV(nn.Module):
     """Vector to vector computation.
 
     Params:
@@ -1034,7 +1034,7 @@ class GraphVtoV(nn.Module):
         vector_features = torch.matmul(vector_features, self.weight) 
         if self.bias is not None:
             vector_features = vector_features + self.bias
-        vector_features = torch.reshape(vector_features, shape=(-1, max_atoms, max_atoms, coor_dims, self.filters))
+        vector_features = torch.reshape(vector_features, shape=(-1, max_atoms, max_atoms, coor_dims, self._out_feats))
 
         # 4. Activation
         if self._activation is not None:
