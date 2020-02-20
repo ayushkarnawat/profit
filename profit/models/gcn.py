@@ -9,7 +9,7 @@ from profit.layers.tensorflow.convs import GraphConvS, GraphConvV
 from profit.layers.tensorflow.embed import GraphEmbed
 from profit.layers.tensorflow.gather import GraphGather
 from profit.layers.tensorflow.nodes import GraphSToS, GraphSToV, GraphVToS, GraphVToV
-from profit.utils.training_utils.metrics import std_mae, std_rmse, std_r2
+from profit.utils.training_utils.tensorflow.metrics import std_mae, std_rmse, std_r2
 
 
 class GCN(object):
@@ -105,6 +105,7 @@ class GCN(object):
         sc_out = Dense(self.units_dense, activation='relu', kernel_regularizer=l2(0.005))(sc)
         sc_out = Dense(self.units_dense, activation='relu', kernel_regularizer=l2(0.005))(sc_out)
 
+        # Apply a dense activation layer to each vector feature
         vc_out = TimeDistributed(Dense(self.units_dense, activation='relu', 
                                        kernel_regularizer=l2(0.005)))(vc)
         vc_out = TimeDistributed(Dense(self.units_dense, activation='relu', 
@@ -133,4 +134,3 @@ class GCN(object):
             raise ValueError("Unsupported task on model generation.")
         
         return model
-        

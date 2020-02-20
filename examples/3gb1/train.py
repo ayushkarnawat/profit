@@ -42,3 +42,23 @@ model = GCN(num_atoms, num_feats, num_outputs=num_outputs, std=labels_std).get_m
 # Fit model and report metrics
 model.fit(train_X, train_y, batch_size=5, epochs=3, shuffle=True, 
           validation_data=(val_X, val_y), verbose=1)
+
+
+# # DEBUG PyTorch version
+# from torch.utils.data import DataLoader
+# from profit.models.gcn_pytorch import Torch3DGCN
+# from profit.utils.data_utils.serializers import LMDBSerializer
+
+# # Load data
+# data = LMDBSerializer.load('data/3gb1/processed/gcn_fitness/tertiary3.mdb', as_numpy=False)
+
+# # Init model
+# num_atoms, num_feats = data[0]['arr_0'].shape
+# gcn = Torch3DGCN(num_atoms, num_feats, num_outputs=1, num_layers=2, units_conv=128, units_dense=128)
+
+# # Batch dataset
+# loader = DataLoader(data, batch_size=2)
+# for batch in loader:
+#     atoms, adjms, dists, labels = batch.values()
+#     out = gcn([atoms, adjms, dists])
+#     print(out)
