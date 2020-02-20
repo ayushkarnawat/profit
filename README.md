@@ -11,6 +11,14 @@ Additionally, find `k` additional compounds that, if given the fitness score, ar
 2. Directed evolution, in-silico. Select a batch and train, then pick the highest variants (ones with the highest aquisition function), and train those in the next batch cycle, in a online fashion. This assumes that for the new variants, we are obtaining a label, which we don't have. Rather, we should condition based on the posterior distribution computed by the model. How do you retrain samples for which you don't have information for. This can help us both sample the whole search space as well as find the top-most variant in decreasing order of fitness.
 
 
+## Models
+We compare many different models to observe (a) which give the best results, (b) is efficent (in terms of training time), and (c) explainable. In increasing order of (training) complexity, 
+1. Linear Regression
+2. Gaussian Processes
+3. (Various) NNs such as LSTM, GCN
+4. etc. (see references below)
+
+
 ## TODO
 1. Implement graph-based models (in pytorch)
 2. Ability to save trained models
@@ -23,8 +31,14 @@ Additionally, find `k` additional compounds that, if given the fitness score, ar
 5. Visualization
     - Plot results for mutation @ postions 39,40,41,54 for all 20 amino acids (w/ fitness score as heatmap), and label wildtype as black (see DOI: 10.1126/science.aaw2900).
 
+
 ## Misc
 To suppress the annoying pylint no-member warnings, add the following to `.vscode/settings.json` (if using vscode):
 ```json
 "python.linting.pylintArgs": ["--generated-members=torch.*"]
 ```
+
+
+## References
+[1] https://www.biorxiv.org/content/biorxiv/early/2018/06/02/337154.full.pdf
+[2] https://www.biorxiv.org/content/biorxiv/early/2019/03/26/589333.full.pdf
