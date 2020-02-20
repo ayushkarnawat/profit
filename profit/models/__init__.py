@@ -1,18 +1,9 @@
-"""
-Ideally we should compare many different models to (a) observe which gives the best results, 
-(b) is efficent, and (c) explainable. 
-1. Linear regression
-2. gaussian processes
-3. Feed-forward network (FFN)
-4. Graph Convolution Network (GCN)
-5. others
+"""Various models and their "logic".
 
-See https://www.biorxiv.org/content/biorxiv/early/2018/06/02/337154.full.pdf and
-https://www.biorxiv.org/content/biorxiv/early/2019/03/26/589333.full.pdf
+In general, all models will be implemented using both pytorch and 
+tensorflow code with the framework-specific logic lying in their 
+respective folders.
 """
 
-from profit.models import gcn
-from profit.models import gcn_pytorch
-
-from profit.models.gcn import GCN
-from profit.models.gcn_pytorch import Torch3DGCN
+from profit.models import pytorch
+from profit.models import tensorflow

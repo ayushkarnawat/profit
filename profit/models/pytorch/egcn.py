@@ -1,4 +1,4 @@
-"""Three-dimensional graph convolution network (GCN).
+"""Three-dimensional embedded graph convolution network (eGCN).
 
 TODO: Should each module contain a `output_shape()` function which 
 determines the shape of the tensors after the forward pass is complete? 
@@ -1062,7 +1062,7 @@ class GraphVToV(nn.Module):
         return summary.format(**self.__dict__)
 
 
-class Torch3DGCN(nn.Module):
+class EmbeddedGCN(nn.Module):
     """Assuming regression task. 
     
     TODO: Add L1/L2 regularizer for weight kernel on fully connected layers?
