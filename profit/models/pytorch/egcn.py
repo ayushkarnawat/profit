@@ -492,24 +492,25 @@ class GraphGather(nn.Module):
         atom_feat = int(vector_features.shape[-1])
 
         # 1. Integrate over atom axis
-        # TODO: Debug, this might be wrong (for vector features)
-        if self.pooling == "sum":
+        if self._pooling == "sum":
             scalar_features = torch.sum(scalar_features, dim=1)
             vector_features = torch.sum(vector_features, dim=1)
-        elif self.pooling == "mean":
+        elif self._pooling == "mean":
             scalar_features = torch.mean(scalar_features, dim=1)
             vector_features = torch.mean(vector_features, dim=1)
-        elif self.pooling == "max":
-            scalar_features = torch.max(scalar_features, dim=1)
-            # Select the vector feats that are max across all XYZ coordinates
-            # NOTE: The reason we permute axis is so that we can use torch.gather along dim=-1
-            vector_features = vector_features.permute(0, 2, 3, 1) # (samples, coor_dims, atom_feat, max_atoms)
-            size = torch.sqrt(torch.sum(torch.square(vector_features), dim=1)) # (samples, atom_feat, max_atoms)
-            # idxs of which atom has the highest value for that particular feature  
-            idx = torch.reshape(torch.argmax(size, dim=-1), shape=(-1, 1, atom_feat, 1)) # (samples, 1, atom_feats, 1)
-            idx = idx.repeat(1, coor_dims, 1, 1) # (samples, coor_dims, atom_feats, 1)
-            vector_features = torch.reshape(torch.gather(vector_features, dim=-1, index=idx), 
-                                            shape=(-1, coor_dims, atom_feat))
+        elif self._pooling == "max":
+            # Select scalar + vector feature that is max across all atoms
+            scalar_features = torch.max(scalar_features, dim=1).values
+            vector_features = torch.max(vector_features, dim=1).values
+            # NOTE: Both computations (statement above and below) are equal
+            # # Reason we permute axis is so that we can use torch.gather along dim=-1
+            # vector_features = vector_features.permute(0, 2, 3, 1) # (samples, coor_dims, atom_feat, max_atoms)
+            # size = torch.sqrt(torch.sum(torch.square(vector_features), dim=1)) # (samples, atom_feat, max_atoms)
+            # # idxs of which atom has the highest value for that particular feature
+            # idx = torch.reshape(torch.argmax(size, dim=-1), shape=(-1, 1, atom_feat, 1)) # (samples, 1, atom_feats, 1)
+            # idx = idx.repeat(1, coor_dims, 1, 1) # (samples, coor_dims, atom_feats, 1)
+            # vector_features = torch.reshape(torch.gather(vector_features, dim=-1, index=idx), 
+            #                                 shape=(-1, coor_dims, atom_feat))
 
         # 2. Activation
         if self._activation is not None:
@@ -1069,7 +1070,7 @@ class EmbeddedGCN(nn.Module):
     """
 
     def __init__(self, num_atoms, num_feats, num_outputs, num_layers, units_conv, units_dense):
-        super(Torch3DGCN, self).__init__()
+        super(EmbeddedGCN, self).__init__()
         self.num_atoms = num_atoms
         self.num_feats = num_feats
         self.num_outputs = num_outputs
