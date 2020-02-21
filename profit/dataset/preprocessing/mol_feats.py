@@ -1,6 +1,6 @@
-import numpy as np
-
 from typing import Any, List, Optional
+
+import numpy as np
 from rdkit.Chem import rdchem, rdmolfiles, rdmolops, rdDistGeom, rdPartialCharges
 
 
@@ -9,10 +9,11 @@ class MolFeatureExtractionError(Exception):
 
 
 def one_hot(x: Any, allowable_set: List[Any]) -> List[int]:
-    """One hot encode labels. 
+    """One hot encode labels.
 
-    If label `x` is not included in the set, set the value to the last element in the list.
-    TODO: Should the above statement be hold? How else can we use the last elem in the list.
+    If label `x` is not included in the set, set the value to the last 
+    element in the list. TODO: Is this true? How else can we use the 
+    last elem in the list.
 
     Params:
     -------
@@ -25,13 +26,16 @@ def one_hot(x: Any, allowable_set: List[Any]) -> List[int]:
     Returns:
     --------
     vec: list of int
-        One hot encoded vector of the features with the label `x` as the True label.
+        One hot encoded vector of the features with the label `x` as 
+        the `True` label.
 
     Examples:
     ---------
-    >>> one_hot(x='Si', allowable_set=['C', 'O', 'N', 'S', 'Cl', 'F', 'Br', 'P', 
-                                       'I', 'Si', 'B', 'Na', 'Sn', 'Se', 'other'])
+    ```python
+    >>> one_hot(x='Si', allowable_set=['C', 'O', 'N', 'S', 'Cl', 'F', 
+    ...     'Br', 'P', 'I', 'Si', 'B', 'Na', 'Sn', 'Se', 'other'])
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0]
+    ```
     """
     # Use last index of set if x is not in set
     if x not in allowable_set:
@@ -42,16 +46,17 @@ def one_hot(x: Any, allowable_set: List[Any]) -> List[int]:
 def check_num_atoms(mol: rdchem.Mol, max_num_atoms: Optional[int]=-1) -> None:
     """Check number of atoms in `mol` does not exceed `max_num_atoms`.
 
-    If number of atoms in `mol` exceeds the number `max_num_atoms`, it will
-    raise `MolFeatureExtractionError` exception.
+    If number of atoms in `mol` exceeds the number `max_num_atoms`, it 
+    will raise `MolFeatureExtractionError` exception.
 
     Params:
     -------
     mol: rdkit.Chem.rdchem.Mol
         The molecule to check.
-        
+
     num_max_atoms: int, optional , default=-1 
-        Maximum allowed number of atoms in a molecule. If negative, check passes unconditionally.
+        Maximum allowed number of atoms in a molecule. If negative, 
+        check passes unconditionally.
     """
     num_atoms = mol.GetNumAtoms()
     if max_num_atoms >= 0 and num_atoms > max_num_atoms:
@@ -61,35 +66,38 @@ def check_num_atoms(mol: rdchem.Mol, max_num_atoms: Optional[int]=-1) -> None:
 
 def construct_mol_features(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.ndarray:
     """Returns the atom features of all the atoms in the molecule.
-    
+
     Params:
     -------
     mol: rdkit.Chem.rdchem.Mol
-        Molecule of interest. 
+        Molecule of interest.
 
     out_size: int, optional, default=-1
-        The size of the returned array. If this option is negative, it does not take any effect.
-        Otherwise, it must be larger than or equal to the number of atoms in the input molecule. 
-        If so, the end of the array is padded with zeros.
+        The size of the returned array. If this option is negative, it 
+        does not take any effect. Otherwise, it must be larger than or 
+        equal to the number of atoms in the input molecule. If so, the 
+        end of the array is padded with zeros.
 
     Returns:
     --------
-    mol_feats: np.ndarray, shape=(n, m)
-        Where `n` is the total number of atoms within the molecule, and `m` is the number of feats.
+    mol_feats: np.ndarray, shape=(n,m)
+        Where `n` is the total number of atoms within the molecule, and 
+        `m` is the number of feats.
     """
     # Caluclate charges and chirality of atoms within molecule
     rdPartialCharges.ComputeGasteigerCharges(mol) # stored under _GasteigerCharge
     rdmolops.AssignStereochemistry(mol) # stored under _CIPCode, see doc for more info
 
     # Retrieve atom index locations of matches
-    HYDROGEN_DONOR = rdmolfiles.MolFromSmarts("[$([N;!H0;v3,v4&+1]),$([O,S;H1;+0]),n&H1&+0]")
-    HYROGEN_ACCEPTOR = rdmolfiles.MolFromSmarts("[$([O,S;H1;v2;!$(*-*=[O,N,P,S])]),$([O,S;H0;" + 
-                                                "v2]),$([O,S;-]),$([N;v3;!$(N-*=[O,N,P,S])])," + 
-                                                "n&H0&+0,$([o,s;+0;!$([o,s]:n);!$([o,s]:c:n)])]")
+    HYDROGEN_DONOR = rdmolfiles.MolFromSmarts("[$([N;!H0;v3,v4&+1]),$([O,S;H1;+0])" + 
+        ",n&H1&+0]")
+    HYROGEN_ACCEPTOR = rdmolfiles.MolFromSmarts("[$([O,S;H1;v2;!$(*-*=[O,N,P,S])])" + 
+        ",$([O,S;H0;v2]),$([O,S;-]),$([N;v3;!$(N-*=[O,N,P,S])]),n&H0&+0," + 
+        "$([o,s;+0;!$([o,s]:n);!$([o,s]:c:n)])]")
     ACIDIC = rdmolfiles.MolFromSmarts("[$([C,S](=[O,S,P])-[O;H1,-1])]")
-    BASIC = rdmolfiles.MolFromSmarts("[#7;+,$([N;H2&+0][$([C,a]);!$([C,a](=O))]),$([N;H1&+0]" + 
-                                     "([$([C,a]);!$([C,a](=O))])[$([C,a]);!$([C,a](=O))]),$" + 
-                                     "([N;H0&+0]([C;!$(C(=O))])([C;!$(C(=O))])[C;!$(C(=O))])]")
+    BASIC = rdmolfiles.MolFromSmarts("[#7;+,$([N;H2&+0][$([C,a]);!$([C,a](=O))])" + 
+        ",$([N;H1&+0]([$([C,a]);!$([C,a](=O))])[$([C,a]);!$([C,a](=O))])," + 
+        "$([N;H0&+0]([C;!$(C(=O))])([C;!$(C(=O))])[C;!$(C(=O))])]")
     hydrogen_donor_match = sum(mol.GetSubstructMatches(HYDROGEN_DONOR), ())
     hydrogen_acceptor_match = sum(mol.GetSubstructMatches(HYROGEN_ACCEPTOR), ())
     acidic_match = sum(mol.GetSubstructMatches(ACIDIC), ())
@@ -114,12 +122,7 @@ def construct_mol_features(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.nd
         atom_feats += [g_charge] if not np.isnan(g_charge) else [0.]
         atom_feats += [atom.GetIsAromatic()]
 
-        atom_feats += [ring.IsAtomInRingOfSize(atom_idx, 3),
-                       ring.IsAtomInRingOfSize(atom_idx, 4),
-                       ring.IsAtomInRingOfSize(atom_idx, 5),
-                       ring.IsAtomInRingOfSize(atom_idx, 6),
-                       ring.IsAtomInRingOfSize(atom_idx, 7),
-                       ring.IsAtomInRingOfSize(atom_idx, 8)]
+        atom_feats += [ring.IsAtomInRingOfSize(atom_idx, size) for size in range(3,9)]
         atom_feats += one_hot(atom.GetTotalNumHs(), [0, 1, 2, 3, 4])
 
         # Chirality
@@ -139,15 +142,15 @@ def construct_mol_features(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.nd
     if out_size < 0:
         return np.array(mol_feats, dtype=np.float)
     elif out_size >= n_atoms:
-        # 'empty' padding for `mol_feats`. Useful to generate feature matrix of same size for all mols
+        # 'empty' padding for `mol_feats`. Generate(s) feature matrix of same size for all mols
         # NOTE: len(mol_feats[0]) is the number of feats
         padded_mol_feats = np.zeros((out_size, len(mol_feats[0])), dtype=np.float)
         padded_mol_feats[:n_atoms] = np.array(mol_feats, dtype=np.float)
         return padded_mol_feats
     else:
-        raise ValueError('`out_size` (N={}) must be negative or larger than or equal to the '
-                         'number of atoms in the input molecules (N={}).'.format(out_size, n_atoms))
-    
+        raise ValueError('`out_size` (N={}) must be negative or larger than or '
+            'equal to the number of atoms in the input molecules (N={}).'.format(out_size, n_atoms))
+
 
 def construct_adj_matrix(mol: rdchem.Mol, 
                          out_size: Optional[int]=-1, 
@@ -155,22 +158,26 @@ def construct_adj_matrix(mol: rdchem.Mol,
                          normalize: Optional[bool]=True) -> np.ndarray:
     """Returns the adjacency matrix of the molecule.
 
-    Normalization of the matrix is highly recommened. When we apply a layer propogation rule 
-    defined by, 
+    Normalization of the matrix is highly recommened. When we apply a 
+    layer propogation rule defined by, 
 
     .. ::math: `f(H^{(l)}, A) = \\sigma(A H^{(l)} W^{(l)})
 
-    multiplication with `A` will completely change the scale of the features vectors, which we can 
-    observe by looking into the eigenvalues of A. By performing :math: `D^{-1}A`, where `D` is the 
-    diagonal degree node matrix, the rows become normalized to 1. However, in practice, it is 
-    better to use symmetric normalization (i.e. :math:`D^{-\\frac{1/2}} \\hat{A} D^{-\\frac{1/2}})
-    as that has been observed to yield better results.  
+    multiplication with `A` will completely change the scale of the 
+    features vectors, which we can observe by looking into the eigenvals 
+    of A. By performing :math: `D^{-1}A`, where `D` is the diagonal 
+    degree node matrix, the rows become normalized to 1. However, in 
+    practice, it is better to use symmetric normalization (i.e. 
+    :math:`D^{-\\frac{1/2}} \\hat{A} D^{-\\frac{1/2}}) as that has been 
+    observed to yield better results.  
 
-    Additionally, when multiplying by `A`, for every node, we sum up all the feature vectors of all 
-    neighboring nodes but not the node itself (unless there are self-loops in the graph). We can 
-    "fix" this by adding self-loops in the graph: aka add an identity matrix `I` to `A`.
+    Additionally, when multiplying by `A`, for every node, we sum up 
+    all the feature vectors of all neighboring nodes but not the node 
+    itself (unless there are self-loops in the graph). We can "fix" this 
+    by adding self-loops in the graph: aka add an identity matrix `I` to `A`.
 
-    See https://tkipf.github.io/graph-convolutional-networks/ for more in-depth overview. 
+    See https://tkipf.github.io/graph-convolutional-networks/ for a 
+    more in-depth overview. 
 
     Params:
     -------
@@ -178,23 +185,26 @@ def construct_adj_matrix(mol: rdchem.Mol,
         Molecule of interest.
 
     out_size: int, optional, default=-1
-        The size of the returned array. If this option is negative, it does not take any effect.
-        Otherwise, it must be larger than or equal to the number of atoms in the input molecule. 
-        If so, the end of the array is padded with zeros.
+        The size of the returned array. If this option is negative, it 
+        does not take any effect. Otherwise, it must be larger than or 
+        equal to the number of atoms in the input molecule. If so, the 
+        end of the array is padded with zeros.
 
     add_self_loops: bool, optional, default=True
-        Whether or not to add the `I` matrix (aka self-connections). If normalize is True, this 
-        option is ignored.
+        Whether or not to add the `I` matrix (aka self-connections).
+        If normalize is True, this option is ignored.
 
     normalize: bool, optional, default=True
-        Whether or not to normalize the matrix. If `True`, the diagonal elements are filled with 1,
-        and symmetric normalization is performed: :math:`D^{-\\frac{1/2}} * \\hat{A} * D^{-\\frac{1/2}}`
+        Whether or not to normalize the matrix. If `True`, the diagonal 
+        elements are filled with 1, and symmetric normalization is 
+        performed: :math:`D^{-\\frac{1/2}} * \\hat{A} * D^{-\\frac{1/2}}`
 
     Returns:
     --------
     adj: np.ndarray
-        Adjacency matrix of input molecule. If `out_size` is non-negative, the returned matrix 
-        is equal to that value. Otherwise, it is equal to the number of atoms in the the molecule.
+        Adjacency matrix of input molecule. If `out_size` is non-negative, 
+        the returned matrix is equal to that value. Otherwise, it is 
+        equal to the number of atoms in the the molecule.
     """
     adj = rdmolops.GetAdjacencyMatrix(mol)
     s1, s2 = adj.shape # shape=(n_atoms, n_atoms) 
@@ -209,7 +219,7 @@ def construct_adj_matrix(mol: rdchem.Mol,
         adj = deg_inv_sqrt
     elif add_self_loops:
         adj = adj + np.eye(s1)
-    
+
     if out_size < 0:
         return adj
     elif out_size >= s1:
@@ -231,17 +241,20 @@ def construct_pos_matrix(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.ndar
         Molecule of interest. 
 
     out_size: int, optional, default=-1
-        The size of the returned array. If this option is negative, it does not take any effect.
-        Otherwise, it must be larger than or equal to the number of atoms in the input molecule. 
-        If so, the end of the array is padded with zeros.
+        The size of the returned array. If this option is negative, it 
+        does not take any effect. Otherwise, it must be larger than or 
+        equal to the number of atoms in the input molecule. If so, the 
+        end of the array is padded with zeros.
 
     Returns:
     --------
     pos_matrix: np.ndarray, shape=(n,n,3)
-        Relative position (XYZ) coordinates from one atom the others in the mol. 
+        Relative position (XYZ) coordinates from one atom the others in 
+        the mol. 
 
     Examples:
     ---------
+    ```python
     >>> from rdkit import Chem
     >>> from rdkit.Chem import AllChem
     >>> smiles = 'N[C@@]([H])([C@]([H])(O2)C)C(=O)N[C@@]([H])(CC(=O)N)C(=O)N[C@@]([H])([C@]([H])' \
@@ -257,6 +270,7 @@ def construct_pos_matrix(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.ndar
     >>> pos_matrix = construct_pos_matrix(mol, out_size=49)
     >>> pos_matrix.shape
     (49,49,3)
+    ```
     """
     # Obtain initial distance geometry between atoms, if unavilable
     if mol.GetNumConformers() == 0:
@@ -274,7 +288,7 @@ def construct_pos_matrix(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.ndar
     else:
         raise ValueError('`out_size` (N={}) is smaller than number of atoms in mol (N={})'.
                          format(out_size, N))
-    
+
     pos_matrix = np.zeros(shape=(size, size, 3), dtype=np.float)
     for atom_idx in range(N):
         atom_pos = coords[atom_idx] # central atom of interest
