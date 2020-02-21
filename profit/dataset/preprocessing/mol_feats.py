@@ -114,7 +114,8 @@ def construct_mol_features(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.nd
                                                         rdchem.HybridizationType.SP3D2])
         atom_feats += one_hot(atom.GetImplicitValence(), [0, 1, 2, 3, 4, 5, 6])
         atom_feats += one_hot(atom.GetFormalCharge(), [-3, -2, -1, 0, 1, 2, 3])
-        atom_feats += [atom.GetProp("_GasteigerCharge")]
+        g_charge = float(atom.GetProp("_GasteigerCharge"))
+        atom_feats += [g_charge] if not np.isnan(g_charge) else [0.]
         atom_feats += [atom.GetIsAromatic()]
 
         atom_feats += [ring.IsAtomInRingOfSize(atom_idx, 3),
