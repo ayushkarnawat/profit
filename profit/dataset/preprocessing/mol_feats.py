@@ -107,11 +107,7 @@ def construct_mol_features(mol: rdchem.Mol, out_size: Optional[int]=-1) -> np.nd
         atom_feats += one_hot(atom.GetSymbol(), ['C', 'O', 'N', 'S', 'Cl', 'F', 'Br', 'P', 
                                                  'I', 'Si', 'B', 'Na', 'Sn', 'Se', 'other'])
         atom_feats += one_hot(atom.GetDegree(), [1,2,3,4,5,6])
-        atom_feats += one_hot(atom.GetHybridization(), [rdchem.HybridizationType.SP,
-                                                        rdchem.HybridizationType.SP2,
-                                                        rdchem.HybridizationType.SP3,
-                                                        rdchem.HybridizationType.SP3D,
-                                                        rdchem.HybridizationType.SP3D2])
+        atom_feats += one_hot(atom.GetHybridization(), list(rdchem.HybridizationType.names.values()))
         atom_feats += one_hot(atom.GetImplicitValence(), [0, 1, 2, 3, 4, 5, 6])
         atom_feats += one_hot(atom.GetFormalCharge(), [-3, -2, -1, 0, 1, 2, 3])
         g_charge = float(atom.GetProp("_GasteigerCharge"))
