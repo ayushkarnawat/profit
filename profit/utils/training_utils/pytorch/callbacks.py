@@ -1,8 +1,8 @@
-"""Pytorch callbacks. Modified from: https://git.io/JvWq5
+"""Pytorch callbacks. Modified from https://git.io/JvWqp.
 
-TODO: Implement as proper callbacks (similar to tf/keras), where after 
-each `on_epoch_end` updates the logs of the quantity to be monitored. 
-See https://git.io/JvWqp for more details on implementation.
+Each callback implements an `on_train`, `on_epoch`, and `on_batch`
+begin and end to determine the functionality of each callback when
+those "events" occur.
 """
 
 import warnings
@@ -11,20 +11,16 @@ from abc import ABC
 from typing import Any, Dict, Optional
 
 import numpy as np
-import torch
+import torch.nn as nn
 
 
 class Callback(ABC):
-    """Abstract base class used to build callbacks."""
+    """Abstract base class for callbacks."""
 
     def __init__(self):
-        self.validation_data = None
         self.model = None
 
-    def set_params(self, params):
-        self.params = params
-
-    def set_model(self, model):
+    def set_model(self, model: nn.Module) -> None:
         self.model = model
 
     def on_epoch_begin(self, epoch: int, logs: Optional[Dict[str, Any]]=None):
@@ -34,10 +30,10 @@ class Callback(ABC):
         -------
         epoch: int
             Current epoch
-        
+
         logs: dict or None, optional, default=None
             Key-value pairs of quantities to monitor.
-        
+
         Example:
         --------
         ```python
@@ -47,52 +43,65 @@ class Callback(ABC):
         pass
 
     def on_epoch_end(self, epoch, logs=None):
-        pass
+        """Called when the epoch ends."""
 
     def on_batch_begin(self, batch, logs=None):
-        """
-        called when the batch starts.
-        Args:
-            batch (Tensor): current batch tensor
-            logs (dict): key-value pairs of quantities to monitor
+        """Called when the batch starts.
+
+        Params:
+        -------
+        batch: Tensor
+            Current batch tensor.
+
+        logs: dict or None, optional, default=None
+            Key-value pairs of quantities to monitor.
         """
         pass
 
     def on_batch_end(self, batch, logs=None):
-        pass
+        """Called when the batch ends."""
 
     def on_train_begin(self, logs=None):
-        pass
+        """Called when training begins."""
 
     def on_train_end(self, logs=None):
-        pass
+        """Called when the training ends."""
 
 
 class EarlyStopping(Callback):
     """Stop training when a monitored quantity has stopped improving.
 
-    Args:
-        monitor (str): quantity to be monitored. Default: ``'val_loss'``.
-        min_delta (float): minimum change in the monitored quantity
-            to qualify as an improvement, i.e. an absolute
-            change of less than `min_delta`, will count as no
-            improvement. Default: ``0``.
-        patience (int): number of epochs with no improvement
-            after which training will be stopped. Default: ``0``.
-        verbose (bool): verbosity mode. Default: ``0``.
-        mode (str): one of {auto, min, max}. In `min` mode,
-            training will stop when the quantity
-            monitored has stopped decreasing; in `max`
-            mode it will stop when the quantity
-            monitored has stopped increasing; in `auto`
-            mode, the direction is automatically inferred
-            from the name of the monitored quantity. Default: ``'auto'``.
-        strict (bool): whether to crash the training if `monitor` is
-            not found in the metrics. Default: ``True``.
+    Params:
+    -------
+    monitor: str, default="val_loss"
+        Quantity to be monitored.
+
+    min_delta: float, default=0.0
+        Minimum change in the monitored quantity to qualify as an
+        improvement, i.e. an absolute change of less than `min_delta`,
+        will count as no improvement.
+
+    patience: int, default=0
+        Number of epochs with no improvement after which training will
+        be stopped.
+
+    verbose: int, default=0
+        Verbosity mode, 0 or 1.
+
+    mode: str, default="auto"
+        One of {auto, min, max}. In `min` mode, training will stop when
+        the quantity monitored has stopped decreasing; in `max` mode it
+        will stop when the quantity monitored has stopped increasing; in
+        `auto` mode, the direction is automatically inferred from the
+        name of the monitored quantity.
+
+    strict: bool, default=True
+        Whether to crash the training if `monitor` is not found in the
+        metrics.
     """
 
-    def __init__(self, monitor='val_loss',
-                 min_delta=0.0, patience=0, verbose=0, mode='auto', strict=True):
+    def __init__(self, monitor='val_loss', min_delta=0.0, patience=0,
+                 verbose=0, mode='auto', strict=True):
         super(EarlyStopping, self).__init__()
 
         self.monitor = monitor
@@ -125,7 +134,19 @@ class EarlyStopping(Callback):
 
         self.on_train_begin()
 
-    def check_metrics(self, logs):
+    def check_metrics(self, logs: Dict[str, Any]) -> bool:
+        """Check whether the quantity is being monitored in the logs.
+
+        Params:
+        -------
+        logs: dict
+            Key-value pairs of quantities to monitor.
+
+        Returns:
+        --------
+        is_monitored: bool
+            Whether or not the quantity is being monitored.
+        """
         monitor_val = logs.get(self.monitor)
         error_msg = (f'Early stopping conditioned on metric `{self.monitor}`'
                      f' which is not available. Available metrics are:'
@@ -147,6 +168,8 @@ class EarlyStopping(Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         stop_training = False
+        # Even if the quantity to be monitored is not within the logs, continue
+        # to train w/o early stopping (if we are not strict about it).
         if not self.check_metrics(logs):
             return stop_training
 
@@ -167,63 +190,56 @@ class EarlyStopping(Callback):
             print(f'Epoch {self.stopped_epoch + 1:05d}: early stopping')
 
 
-# class EarlyStopping(object):
-#     """Stops training when a monitored quantity has stoped improving.
-    
-#     Params:
-#     -------
-#     monitor: str, default="val_loss"
-#         Quantity to be monitored. Ignored for now. TODO: Implement
+class ModelCheckpoint(Callback):
+    """Saves the model after each epoch.
 
-#     min_delta: float, default=0
-#         Minimum change in the monitored quantity to qualify as an 
-#         improvement, i.e. an absolute change of less than `min_delta`, 
-#         will count as no improvement.
-    
-#     patience: int, default=5
-#         Number of epochs with no improvement after which training will 
-#         be stopped.
-    
-#     verbose: bool, default=False
-#         Verbosity mode. If True, prints info about each `monitor` 
-#         quantity improvement.
-#     """
+    Params:
+    -------
+    filepath: str
+        Path to save the model parameter weights file. Can contain named
+        formatting options to be auto-filled.
 
-#     def __init__(self, monitor: str="val_loss", min_delta: float=0., 
-#                  patience: int=5, verbose: bool=False):
-#         self.patience = patience
-#         self.verbose = verbose
-#         self.counter = 0
-#         self.best_score = None
-#         self.early_stop = False
-#         self.val_loss_min = np.Inf
-#         self.delta = min_delta
+    monitor: str, default="val_loss"
+        Quantity to be monitored.
 
-#     def on_epoch_end(self, val_loss, model):
-#         """Called when the epoch ends.
-        
-#         Determines whether or not to save the model based on historical 
-#         performance of the val_loss (aka whenever it decreases).
-#         """
-#         score = -val_loss
+    verbose: int, default=0
+        Verbosity mode, 0 or 1.
 
-#         if self.best_score is None:
-#             self.best_score = score
-#             self.save_checkpoint(val_loss, model)
-#         elif score < self.best_score + self.delta:
-#             self.counter += 1
-#             print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
-#             if self.counter >= self.patience:
-#                 self.early_stop = True
-#         else:
-#             self.best_score = score
-#             self.save_checkpoint(val_loss, model)
-#             self.counter = 0
+    save_top_k: int, default=1
+        If `save_top_k=k`, the best `k` models according to the quantity
+        monitored are saved. If `save_top_k=0`, no models will be saved.
+        If `save_top_k=-1`, all models are saved. If `save_top_k >= 2`
+        and the callback is called multiple times inside an epoch, the
+        name of the saved file will be appended with a version count
+        starting with `v0`. Note that the quantities monitored are
+        checked every `period` epochs.
 
-#     def save_checkpoint(self, val_loss, model):
-#         """Saves model when validation loss decrease."""
-#         if self.verbose:
-#             print(f"Validation loss decreased ({self.val_loss_min:.6f} " + 
-#                    "--> {val_loss:.6f}). Saving model ...")
-#         torch.save(model.state_dict(), 'checkpoint.pt')
-#         self.val_loss_min = val_loss
+    save_weights_only: bool, default=False
+        If True, then only the model's weights will be saved, else the
+        full model is saved.
+
+    mode: str, default="auto"
+        One of {auto, min, max}. In `min` mode, training will stop when
+        the quantity monitored has stopped decreasing; in `max` mode it
+        will stop when the quantity monitored has stopped increasing; in
+        `auto` mode, the direction is automatically inferred from the
+        name of the monitored quantity.
+
+    period: int, default=1
+        Interval (number of epochs) between checkpoints.
+
+    prefix: str, default=""
+        Filepath prefix.
+    """
+
+    def __init__(self):
+        pass
+
+
+if __name__ == "__main__":
+    clbk = EarlyStopping("val_loss", min_delta=0.3, patience=2, verbose=True)
+    losses = [10, 9, 8, 8, 6, 4.3, 5, 4.4, 2.8, 2.5]
+    for i, loss in enumerate(losses):
+        stop = clbk.on_epoch_end(i, logs={"val_loss": loss})
+        if stop:
+            break
