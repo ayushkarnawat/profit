@@ -300,11 +300,14 @@ class ModelCheckpoint(Callback):
         dirpath = os.path.dirname(filepath)
         os.makedirs(dirpath, exist_ok=True)
 
-        # For now, just save the model weights. NOTE: It might be useful to save
+        # Save the entire model or its weights. NOTE: It might be useful to save
         # other info such as current epoch, loss, model's state, optimizer's
         # state, etc. TODO: How do we get the epoch, loss, and optimizer info?
         # See: https://pytorch.org/tutorials/beginner/saving_loading_models.html
-        torch.save(self.model.state_dict(), filepath)
+        if self.save_weights_only:
+            torch.save(self.model.state_dict(), filepath)
+        else:
+            torch.save(model, filepath)
 
     def check_monitor_top_k(self, current: float) -> bool:
         """Check the quantity monitored for improvement."""
@@ -313,7 +316,7 @@ class ModelCheckpoint(Callback):
             return True
         return self.monitor_op(current, self.best_k_models[self.kth_best_model])
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict[str, Any]]=None):
         """Called when the epoch ends."""
         logs = logs or {}
         self.epochs_since_last_check += 1
