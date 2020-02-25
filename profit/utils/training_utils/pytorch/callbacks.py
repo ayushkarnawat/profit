@@ -27,49 +27,35 @@ class Callback(ABC):
         """Sets the torch model."""
         self.model = model
 
-    def on_epoch_begin(self, epoch: int, logs: Optional[Dict[str, Any]]=None):
-        """Called when the epoch begins.
+    def on_epoch_begin(self, epoch: int, logs: Optional[Dict[str, Any]] = None):
+        """Called when the epoch begins."""
 
-        Params:
-        -------
-        epoch: int
-            Current epoch
-
-        logs: dict or None, optional, default=None
-            Key-value pairs of quantities to monitor.
-
-        Example:
-        --------
-        ```python
-        on_epoch_begin(epoch=2, logs={'val_loss': 0.2})
-        ```
-        """
-        pass
-
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict[str, Any]] = None):
         """Called when the epoch ends."""
 
-    def on_batch_begin(self, batch, logs=None):
-        """Called when the batch starts.
+    def on_batch_begin(self, logs: Optional[Dict[str, Any]] = None):
+        """Called when the training batch starts."""
 
-        Params:
-        -------
-        batch: Tensor
-            Current batch tensor.
+    def on_batch_end(self, logs: Optional[Dict[str, Any]] = None):
+        """Called when the training batch ends."""
 
-        logs: dict or None, optional, default=None
-            Key-value pairs of quantities to monitor.
-        """
-        pass
+    def on_train_begin(self, logs: Optional[Dict[str, Any]] = None):
+        """Called when the training begins."""
 
-    def on_batch_end(self, batch, logs=None):
-        """Called when the batch ends."""
-
-    def on_train_begin(self, logs=None):
-        """Called when training begins."""
-
-    def on_train_end(self, logs=None):
+    def on_train_end(self, logs: Optional[Dict[str, Any]] = None):
         """Called when the training ends."""
+
+    def on_validation_begin(self, logs: Optional[Dict[str, Any]] = None):
+        """Called when the validation loop begins."""
+
+    def on_validation_end(self, logs: Optional[Dict[str, Any]] = None):
+        """Called when the validation loop ends."""
+
+    def on_test_begin(self, logs: Optional[Dict[str, Any]] = None):
+        """Called when the test begins."""
+
+    def on_test_end(self, logs: Optional[Dict[str, Any]] = None):
+        """Called when the test ends."""
 
 
 class EarlyStopping(Callback):
