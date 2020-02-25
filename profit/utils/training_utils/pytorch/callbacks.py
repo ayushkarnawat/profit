@@ -256,8 +256,7 @@ class ModelCheckpoint(Callback):
         self.period = period
         self.prefix = prefix
         self.epochs_since_last_check = 0
-        self.best_k_models = {}
-        # {filename: monitor}
+        self.best_k_models = {} # {filename: monitor}
         self.kth_best_model = ''
         self.best = 0
 
@@ -326,11 +325,12 @@ class ModelCheckpoint(Callback):
             return
         if self.epochs_since_last_check >= self.period:
             self.epochs_since_last_check = 0 # reset
-            filepath = f'{self.savedir}/{self.prefix}_epoch{epoch}.ckpt'
+            filepath = os.path.join(f"{self.savedir}", f"{self.prefix}_epoch{epoch}.ckpt")
             version_cnt = 0
             while os.path.isfile(filepath):
                 # if this epoch was called before, make versions
-                filepath = f'{self.savedir}/{self.prefix}_epoch{epoch}_v{version_cnt}.ckpt'
+                filepath = os.path.join(f"{self.savedir}", 
+                                        f"{self.prefix}_epoch{epoch}_v{version_cnt}.ckpt")
                 version_cnt += 1
 
             if self.save_top_k != -1:
@@ -381,17 +381,16 @@ if __name__ == "__main__":
     from profit.models.pytorch.egcn import EmbeddedGCN
     model = EmbeddedGCN(num_atoms=50, num_feats=63, num_outputs=1,
                         num_layers=2, units_conv=8, units_dense=8)
-    clbk = ModelCheckpoint("ckpt_test/", monitor="val_loss", verbose=1, save_top_k=2)
-    clbk.set_model(model)
+
+    # Setup callbacks
+    stop_clbk = EarlyStopping("val_loss", min_delta=0.3, patience=2, verbose=1)
+    save_clbk = ModelCheckpoint("ckpt_test/", monitor="val_loss", verbose=1, save_top_k=2)
+    save_clbk.set_model(model)
 
     # Generate "fake" losses for the model
-    losses = [10, 9, 8, 8, 6, 4.3, 5, 4.4]
+    losses = [10, 9, 8, 8, 6, 4.3, 5, 4.4, 2.8, 2.5]
     for i, loss in enumerate(losses):
-        clbk.on_epoch_end(i, logs={"val_loss": loss})
-
-    # clbk = EarlyStopping("val_loss", min_delta=0.3, patience=2, verbose=True)
-    # losses = [10, 9, 8, 8, 6, 4.3, 5, 4.4, 2.8, 2.5]
-    # for i, loss in enumerate(losses):
-    #     stop = clbk.on_epoch_end(i, logs={"val_loss": loss})
-    #     if stop:
-    #         break
+        save_clbk.on_epoch_end(i, logs={"val_loss": loss})
+        should_stop = stop_clbk.on_epoch_end(i, logs={"val_loss": loss})
+        if should_stop:
+            break
