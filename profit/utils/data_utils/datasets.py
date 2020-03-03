@@ -76,8 +76,11 @@ def TensorflowLMDBDataset(path: str) -> tf.data.Dataset:
 
 
 def TensorflowNumpyDataset(path: str) -> tf.data.Dataset:
-    """Parse (generic) numpy dataset into a `tf.data.Dataset` object, 
+    """Parse (generic) numpy dataset into a `tf.data.Dataset` object,
     which contains `tf.Tensor`s.
+
+    NOTE: The npz file must contain a key named "saved_axis" which
+    represents the axis where the `num_samples` are saved.
 
     Params:
     -------
@@ -89,50 +92,12 @@ def TensorflowNumpyDataset(path: str) -> tf.data.Dataset:
     dataset: tf.data.Dataset
         Dataset loaded into its `tf.data.Dataset` form.
     """
-    class NumpyDatasetGenerator(object):
-        """Generates dataset examples contained in a .npz file. 
-        
-        NOTE: We pass this object into `tf.data.Dataset.from_generator()` 
-        to load the `tf.data.Dataset` object.
-        """
-
-        def __init__(self, path: str):
-            self.npzfile = np.load(path, allow_pickle=False)
-            self.keys = list(self.npzfile.keys())
-
-            # Retrive first sample to help recover proper types/shapes of ndarrays. 
-            # NOTE: We do not check if all the samples have the same type/shape
-            # since (a) we checked for it when saving the file and (b) it is more 
-            # efficient. However, if the file is modified in between saving and 
-            # loading (see https://w.wiki/GQE), this could lead to potential issues. 
-            # TODO: Do we check if all the samples have the same type/shape?
-            self.example = pkl.loads(self.npzfile.get(self.keys[0]))
-
-        def __call__(self) -> Dict[str, np.ndarray]:
-            # Yield a dict with "arr_n" as the key and the ndarray as the value
-            for key in self.keys:
-                yield pkl.loads(self.npzfile.get(key))
-
-        @property
-        def output_shapes(self) -> Dict[str, Tuple[int, ...]]:
-            """Defines the data shapes used to store the dataset. 
-            
-            Helps recover `np.ndarray`s types when loading into a 
-            `tf.data.Dataset` object using `from_generator()`.
-            """
-            return {key: np.array(arr).shape for key, arr in self.example.items()}
-
-        @property
-        def output_types(self) -> Dict[str, type]:
-            """Defines the data types used to store the dataset. 
-            
-            Helps recover `np.ndarray`s shapes when loading into a 
-            `tf.data.Dataset` object using `from_generator()`.
-            """
-            return {key: tf.float32 for key in self.example.keys()}
-
-    dsg = NumpyDatasetGenerator(path)
-    return tf.data.Dataset.from_generator(dsg, dsg.output_types, dsg.output_shapes)
+    with np.load(path, allow_pickle=False) as npzfile:
+        # Move axis representing num_samples (aka saved_axis) to first axis
+        saved_axis = int(npzfile["saved_axis"])
+        data_dict = {key: np.moveaxis(npzfile[key], saved_axis, 0)
+                     for key in npzfile["__keys__"]}
+    return tf.data.Dataset.from_tensor_slices(data_dict)
 
 
 def TFRecordsDataset(path: str) -> tf.data.Dataset:
@@ -271,29 +236,32 @@ class TorchLMDBDataset(Dataset):
 
 
 class TorchNumpyDataset(Dataset):
-    """Parse (generic) numpy dataset into a `torch.utils.data.Dataset` 
+    """Parse (generic) numpy dataset into a `torch.utils.data.Dataset`
     object, which contains `torch.Tensor`s.
 
-    NOTE: Regardless of the format the data is saved in, the examples 
-    are always concatenated vertically row-wise (aka first channel).
+    NOTE: The npz file must contain a key named "saved_axis" which
+    represents the axis where the `num_samples` are saved.
 
     Params:
     -------
     path: str
         Npz file which contains dataset.
     """
-
     def __init__(self, path: str):
-        self.npzfile = np.load(path, allow_pickle=False)
-        self.keys = list(self.npzfile.keys())
+        with np.load(path, allow_pickle=False) as npzfile:
+            self.saved_axis = int(npzfile["saved_axis"])
+            self.keys = list(npzfile["__keys__"])
+            tensors = [torch.from_numpy(npzfile[key]) for key in self.keys]
+        assert all(tensors[0].size(self.saved_axis) == tensor.size(self.saved_axis)
+                   for tensor in tensors)
+        self.tensors = dict(zip(self.keys, tensors))
 
     def __len__(self) -> int:
-        return len(self.keys)
+        return self.tensors[self.keys[0]].size(self.saved_axis)
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        # Convert to pytorch tensors
-        example = pkl.loads(self.npzfile.get(self.keys[idx]))
-        return {key: torch.FloatTensor(arr) for key,arr in example.items()}
+        return {key: tensor[idx] if self.saved_axis == 0 else tensor[..., idx]
+                for key, tensor in self.tensors.items()}
 
 
 class TorchTFRecordsDataset(IterableDataset):

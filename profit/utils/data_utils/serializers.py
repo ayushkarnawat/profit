@@ -238,7 +238,7 @@ class LMDBSerializer(LazySerializer):
 
 
     @staticmethod
-    def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, \
+    def load(path: str, as_numpy: bool = False) -> Union[np.ndarray, \
             List[np.ndarray], TFDataset, TorchDataset]:
         """Load the dataset.
 
@@ -282,16 +282,16 @@ class LMDBSerializer(LazySerializer):
 
 class NumpySerializer(InMemorySerializer):
     """Serialize ndarray's to a npz dict.
-    
-    Note that npz files do not support lazy loading and are >10x slower 
+
+    Note that npz files do not support lazy loading and are >10x slower
     than LMDB/TFRecord serializers. Use :class:`LMDBSerializer` instead.
     """
 
     @staticmethod
-    def save(data: Union[np.ndarray, List[np.ndarray]], path: str, 
-             compress: bool=True) -> None:
+    def save(data: Union[np.ndarray, List[np.ndarray]], path: str,
+             compress: bool = True) -> None:
         """Save data to .npz file.
-        
+
         Params:
         -------
         data: np.ndarray or list of np.ndarray
@@ -301,79 +301,54 @@ class NumpySerializer(InMemorySerializer):
             Output npz file.
 
         compress: bool, default=True
-            If True, uses gzip to compress the file. If False, no 
+            If True, uses gzip to compress the file. If False, no
             compression is performed.
         """
         if isinstance(data, np.ndarray):
             data = [data]
 
         # Check for same num of examples in the multiple ndarray's
-        shapes = [arr.shape for arr in data]
         axis = 0 if P.data_format() == "batch_first" else -1
-        num_examples = [shape[axis] for shape in shapes]
-        if num_examples[1:] != num_examples[:-1]:
-            raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
-                f"(axis={axis}): {shapes} - is the data format correct?")
+        assert all(data[0].shape[axis] == arr.shape[axis] for arr in data), \
+            (f"Unequal num of examples in {P.data_format()} (axis={axis}): "
+             f"{[arr.shape for arr in data]} - is the data format correct?")
 
-        dataset_dict = {}
-        n_examples = num_examples[0]
-        for idx in tqdm(range(n_examples), total=n_examples):
-            # NOTE: Since numpy cannot serialize lists of np.arrays together 
-            # for each individual example, we have to store them as a dict 
-            # object. Each example, which is denoted by a key, contains a 
-            # dict with the key names being "arr_0", ..., "arr_n" based on 
-            # which array it is referencing. Additionally, each ndarray is  
-            # converted to lists of lists to save storage space.
-            example = {f"arr_{i}": arr[idx].tolist() if P.data_format() == \
-                "batch_first" else arr[...,idx].tolist() for i,arr in enumerate(data)}
-            key = u'{:08}'.format(idx)
-            dataset_dict[key] = pkl.dumps(example, protocol=-1)
+        dataset_dict = {f"arr_{idx}": arr for idx, arr in enumerate(data)}
+        dataset_dict["__keys__"] = [f'arr_{idx}' for idx in range(len(data))]
+        dataset_dict["saved_axis"] = axis
 
-        # Save each example (denoted by key) seperately
+        # Save each ndarray (denoted by its key) seperately
         np.savez_compressed(path, **dataset_dict) if compress \
             else np.savez(path, **dataset_dict)
-        
+
 
     @staticmethod
-    def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, \
+    def load(path: str, as_numpy: bool = False) -> Union[np.ndarray, \
             List[np.ndarray], TFDataset, TorchDataset]:
         """Load the dataset.
-        
+
         Params:
         -------
         path: str
             Npz file which contains dataset.
 
         as_numpy: bool, default=False
-            If True, loads the dataset as a list of np.ndarray's (in 
-            its original form). If False, loads the dataset in  
+            If True, loads the dataset as a list of np.ndarray's (in
+            its original form). If False, loads the dataset in
             P.backend()'s specified format.
 
         Returns:
         --------
         data: np.ndarray, torch.utils.data.Dataset, or tf.data.Dataset
-            The dataset (either in its original shape/format or in 
+            The dataset (either in its original shape/format or in
             P.backend()'s specified format).
         """
         if as_numpy:
-            dataset_dict = {}
-            axis = 0 if P.data_format() == "batch_first" else -1
+            out_axis = 0 if P.data_format() == "batch_first" else -1
             with np.load(path, allow_pickle=False) as npzfile:
-                for key in list(npzfile.keys()):
-                    example = pkl.loads(npzfile.get(key))
-                    for name, arr in example.items():
-                        arr = np.array(arr)
-                        newshape = [1] + list(arr.shape) if P.data_format() == \
-                            "batch_first" else list(arr.shape) + [1]
-                        reshaped = np.reshape(arr, newshape=newshape)
-                        # Concatenate individual examples together into one ndarray.
-                        if name not in dataset_dict.keys():
-                            dataset_dict[name] = reshaped
-                        else:
-                            dataset_dict[name] = np.concatenate((dataset_dict.get(name), \
-                                reshaped), axis=axis)
-            # Extract np.ndarray's from dict and return in its original form
-            data = [arr for arr in dataset_dict.values()]
+                saved_axis = int(npzfile["saved_axis"])
+                data = [np.moveaxis(npzfile[key], saved_axis, out_axis)
+                        for key in npzfile["__keys__"]]
             return data[0] if len(data) == 1 else data
         return TorchNumpyDataset(path) if P.backend() == "pytorch" \
             else TensorflowNumpyDataset(path)
