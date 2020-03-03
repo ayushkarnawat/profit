@@ -1,7 +1,7 @@
 import os
-import json
 import struct
 import platform
+import pickle as pkl
 
 from abc import abstractmethod, ABC
 from typing import Any, Dict, List, Union
@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Union
 import h5py
 import lmdb
 import numpy as np
-import pickle as pkl
 import tensorflow as tf
 
 from tqdm import tqdm
@@ -32,13 +31,13 @@ class BaseSerializer(ABC):
 
     @staticmethod
     @abstractmethod
-    def save(data: Any, path: str) -> None:
+    def save(data: Any, path: str, **kwargs: Dict[str, Any]) -> None:
         """Save the data to file."""
         raise NotImplementedError
 
     @staticmethod
     @abstractmethod
-    def load(path: str) -> Any:
+    def load(path: str, as_numpy: bool = False) -> Any:
         """Load the dataset into its original shape/format."""
         raise NotImplementedError
 
@@ -48,13 +47,13 @@ class InMemorySerializer(BaseSerializer, ABC):
 
     @staticmethod
     @abstractmethod
-    def save(data: Any, path: str) -> None:
+    def save(data: Any, path: str, **kwargs: Dict[str, Any]) -> None:
         """Save the data to file."""
         raise NotImplementedError
     
     @staticmethod
     @abstractmethod
-    def load(path: str) -> Any:
+    def load(path: str, as_numpy: bool = False) -> Any:
         """Load the dataset (in memory) into its original shape/format."""
         raise NotImplementedError
 
@@ -64,28 +63,29 @@ class LazySerializer(BaseSerializer, ABC):
 
     @staticmethod
     @abstractmethod
-    def save(data: Any, path: str) -> None:
+    def save(data: Any, path: str, **kwargs: Dict[str, Any]) -> None:
         """Save the data to file."""
         raise NotImplementedError
 
     @staticmethod
     @abstractmethod
-    def load(path: str) -> Any:
+    def load(path: str, as_numpy: bool = False) -> Any:
         """Lazily load the dataset into its original shape/format."""
         raise NotImplementedError
 
 
 class HDF5Serializer(InMemorySerializer):
     """Serialize ndarray's to HDF5 file.
-    
+
     Note that HDF5 files are not that performant and do not (currently) 
     support lazy loading. It is better to use :class:`LMDBSerializer`.
     """
 
     @staticmethod
-    def save(data: Union[np.ndarray, List[np.ndarray]], path: str) -> None:
+    def save(data: Union[np.ndarray, List[np.ndarray]], path: str,
+             compress: bool = True) -> None:
         """Save data to .h5 (or .hdf5) file.
-        
+
         Params:
         -------
         data: np.ndarray or list of np.ndarray
@@ -93,41 +93,33 @@ class HDF5Serializer(InMemorySerializer):
 
         path: str
             Output HDF5 file.
+
+        compress: bool, default=True
+            If True, uses gzip to compress the file. If False, no
+            compression is performed.
         """
         if isinstance(data, np.ndarray):
             data = [data]
 
+        # Check for same num of examples in the multiple ndarray's
+        axis = 0 if P.data_format() == "batch_first" else -1
+        assert all(data[0].shape[axis] == arr.shape[axis] for arr in data), \
+            (f"Unequal num of examples in {P.data_format()} (axis={axis}): "
+             f"{[arr.shape for arr in data]} - is the data format correct?")
+
         with h5py.File(path, "w") as h5file:
-            # Check for same num of examples in the multiple ndarray's
-            shapes = [arr.shape for arr in data]
-            axis = 0 if P.data_format() == "batch_first" else -1
-            num_examples = [shape[axis] for shape in shapes]
-            if num_examples[1:] != num_examples[:-1]:
-                raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
-                    f"(axis={axis}): {shapes} - is the data format correct?")
-
-            n_examples = num_examples[0]
-            for idx in tqdm(range(n_examples), total=n_examples):
-                # NOTE: Since numpy cannot serialize lists of np.arrays together 
-                # for each individual example, we have to store them as a JSON 
-                # object. Each example, which is denoted by a key, contains a 
-                # dict with the key names being "arr_0", ..., "arr_n" based on 
-                # which array it is referencing. Additionally, each ndarray has 
-                # to be converted to lists of lists for proper storage.
-                example = {f"arr_{i}": arr[idx].tolist() if P.data_format() == \
-                    "batch_first" else arr[...,idx].tolist() for i,arr in enumerate(data)}
-                key = u'{:08}'.format(idx).encode('ascii')
-
-                # Convert dict to str so that json.loads() can recover 
-                # info correctly when loading.
-                h5file.create_dataset(name=key, data=json.dumps(example))
+            # Save ndarrays and axis where num_samples is represented
+            h5file.attrs.create("saved_axis", axis)
+            for idx, arr in enumerate(data):
+                h5file.create_dataset(name=f"arr_{idx}", data=arr, chunks=True,
+                                      compression="gzip" if compress else None)
 
 
     @staticmethod
-    def load(path: str, as_numpy: bool=False) -> Union[List[np.ndarray], \
-            np.ndarray, TorchDataset, TensorflowDataset]:
+    def load(path: str, as_numpy: bool = False) -> Union[np.ndarray, \
+            List[np.ndarray], TensorflowDataset, TorchDataset]:
         """Load the dataset.
-        
+
         Params:
         -------
         path: str
@@ -145,24 +137,11 @@ class HDF5Serializer(InMemorySerializer):
             P.backend()'s specified format).
         """
         if as_numpy:
-            dataset_dict = {}
-            axis = 0 if P.data_format() == "batch_first" else -1
             with h5py.File(path, "r") as h5file:
-                for key in list(h5file.keys()):
-                    example = json.loads(h5file.get(key)[()])
-                    for name, arr in example.items():
-                        arr = np.array(arr)
-                        newshape = [1] + list(arr.shape) if P.data_format() == \
-                            "batch_first" else list(arr.shape) + [1]
-                        reshaped = np.reshape(arr, newshape=newshape)
-                        # Concatenate individual examples together into one ndarray.
-                        if name not in dataset_dict.keys():
-                            dataset_dict[name] = reshaped
-                        else:
-                            dataset_dict[name] = np.concatenate((dataset_dict.get(name), \
-                                reshaped), axis=axis)
-            # Extract np.ndarray's from dict and return in its original form
-            data = [arr for arr in dataset_dict.values()]
+                saved_axis = h5file.attrs.get("saved_axis")
+                out_axis = 0 if P.data_format() == "batch_first" else -1
+                data = [np.moveaxis(arr[:], saved_axis, out_axis)
+                        for arr in h5file.values()]
             return data[0] if len(data) == 1 else data
         return TorchHDF5Dataset(path) if P.backend() == "pytorch" \
             else TensorflowHDF5Dataset(path)

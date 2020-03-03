@@ -1,13 +1,12 @@
 import os
-import json
+import pickle as pkl
 
 from functools import partial
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple
 
 import h5py
 import lmdb
 import numpy as np
-import pickle as pkl
 import tensorflow as tf
 
 import torch
@@ -17,63 +16,27 @@ from profit.utils.data_utils.tfreader import tfrecord_loader
 
 
 def TensorflowHDF5Dataset(path: str) -> tf.data.Dataset:
-    """Parse (generic) HDF5 dataset into a `tf.data.Dataset` object, 
+    """Parse (generic) HDF5 dataset into a `tf.data.Dataset` object,
     which contains `tf.Tensor`s.
+
+    NOTE: The HDF5 file must contain an attribute named "saved_axis"
+    which represents the axis where the `num_samples` are saved.
 
     Params:
     -------
     path: str
         HDF5 file which contains dataset.
-    
+
     Returns:
     --------
     dataset: tf.data.Dataset
         Dataset loaded into its `tf.data.Dataset` form.
     """
-    class HDF5DatasetGenerator(object):
-        """Generates dataset examples contained in a .h5/.hdf5 file. 
-        
-        NOTE: We pass this object into `tf.data.Dataset.from_generator()` 
-        to load the `tf.data.Dataset` object.
-        """
-
-        def __init__(self, path: str):
-            self.h5file = h5py.File(path, "r")
-            self.keys = list(self.h5file.keys())
-
-            # Retrive first sample to help recover proper types/shapes of ndarrays. 
-            # NOTE: We do not check if all the samples have the same type/shape
-            # since (a) we checked for it when saving the file and (b) it is more 
-            # efficient. However, if the file is modified in between saving and 
-            # loading (see https://w.wiki/GQE), this could lead to potential issues. 
-            # TODO: Do we check if all the samples have the same type/shape?
-            self.example = json.loads(self.h5file.get(self.keys[0])[()])
-
-        def __call__(self) -> Dict[str, np.ndarray]:
-            # Yield a dict with "arr_n" as the key and the ndarray as the value
-            for key in self.keys:
-                yield json.loads(self.h5file.get(key)[()])
-
-        @property
-        def output_shapes(self) -> Dict[str, Tuple[int, ...]]:
-            """Defines the data shapes used to store the dataset. 
-            
-            Helps recover `np.ndarray`s types when loading into a 
-            `tf.data.Dataset` object using `from_generator()`.
-            """
-            return {key: np.array(arr).shape for key, arr in self.example.items()}
-
-        @property
-        def output_types(self) -> Dict[str, type]:
-            """Defines the data types used to store the dataset. 
-            
-            Helps recover `np.ndarray`s shapes when loading into a 
-            `tf.data.Dataset` object using `from_generator()`.
-            """
-            return {key: tf.float32 for key in self.example.keys()}
-
-    dsg = HDF5DatasetGenerator(path)
-    return tf.data.Dataset.from_generator(dsg, dsg.output_types, dsg.output_shapes)
+    with h5py.File(path, "r") as h5file:
+        # Move axis representing num_samples (aka saved_axis) to first axis
+        saved_axis = h5file.attrs.get("saved_axis")
+        data_dict = {key: np.moveaxis(arr[:], saved_axis, 0) for key, arr in h5file.items()}
+    return tf.data.Dataset.from_tensor_slices(data_dict)
 
 
 def TensorflowLMDBDataset(path: str) -> tf.data.Dataset:
@@ -272,11 +235,14 @@ def TFRecordsDataset(path: str) -> tf.data.Dataset:
 
 
 class TorchHDF5Dataset(Dataset):
-    """Parse (generic) HDF5 dataset into a `torch.utils.data.Dataset` 
+    """Parse (generic) HDF5 dataset into a `torch.utils.data.Dataset`
     object, which contains `torch.Tensor`s.
 
-    NOTE: Regardless of the format the data is saved in, the examples 
+    NOTE: Regardless of the format the data is saved in, the examples
     are always concatenated vertically row-wise (aka first channel).
+
+    NOTE: The HDF5 file must contain an attribute named "saved_axis"
+    which represents the axis where the `num_samples` are saved.
 
     Params:
     -------
@@ -285,16 +251,20 @@ class TorchHDF5Dataset(Dataset):
     """
 
     def __init__(self, path: str):
-        self.h5file = h5py.File(path, "r")
-        self.keys = list(self.h5file.keys())
+        with h5py.File(path, "r") as h5file:
+            self.saved_axis = h5file.attrs.get("saved_axis")
+            self.keys = list(h5file.keys())
+            tensors = [torch.FloatTensor(arr[:]) for arr in h5file.values()]
+        assert all(tensors[0].size(self.saved_axis) == tensor.size(self.saved_axis)
+                   for tensor in tensors)
+        self.tensors = dict(zip(self.keys, tensors))
 
     def __len__(self) -> int:
-        return len(self.keys)
+        return self.tensors[self.keys[0]].size(self.saved_axis)
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        # Convert to pytorch tensors
-        example = json.loads(self.h5file.get(self.keys[idx])[()])
-        return {key: torch.FloatTensor(arr) for key,arr in example.items()}
+        return {key: tensor[idx] if self.saved_axis == 0 else tensor[..., idx]
+                for key, tensor in self.tensors.items()}
 
 
 class TorchLMDBDataset(Dataset):
