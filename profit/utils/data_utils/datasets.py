@@ -40,8 +40,11 @@ def TensorflowHDF5Dataset(path: str) -> tf.data.Dataset:
 
 
 def TensorflowLMDBDataset(path: str) -> tf.data.Dataset:
-    """Parse (generic) LMDB dataset into a `tf.data.Dataset` object, 
+    """Parse (generic) LMDB dataset into a `tf.data.Dataset` object,
     which contains `tf.Tensor`s.
+
+    NOTE: The LMDB file must contain a key named "saved_axis" which
+    represents the axis where the `num_samples` are saved.
 
     Params:
     -------
@@ -53,62 +56,23 @@ def TensorflowLMDBDataset(path: str) -> tf.data.Dataset:
     dataset: tf.data.Dataset
         Dataset loaded into its `tf.data.Dataset` form.
     """
-    class LMDBDatasetGenerator(object):
-        """Generates dataset examples contained in a .mdb/.lmdb file. 
-        
-        NOTE: We pass this object into `tf.data.Dataset.from_generator()` 
-        to load the `tf.data.Dataset` object.
-        """
+    # Check whether directory or full filename is provided. If dir,
+    # check for "data.mdb" file within dir.
+    isdir = os.path.isdir(path)
+    if isdir:
+        default_path = os.path.join(path, "data.mdb")
+        assert os.path.isfile(default_path), "LMDB default file {} " \
+            "does not exist!".format(default_path)
+    else:
+        assert os.path.isfile(path), f"LMDB file {path} does not exist!"
 
-        def __init__(self, path: str):
-            # Check whether directory or full filename is provided. If dir, 
-            # check for "data.mdb" file within dir.
-            isdir = os.path.isdir(path)
-            if isdir:
-                default_path = os.path.join(path, "data.mdb")
-                assert os.path.isfile(default_path), "LMDB default file {} " \
-                    "does not exist!".format(default_path)
-            else:
-                assert os.path.isfile(path), f"LMDB file {path} does not exist!"
-
-            self.db = lmdb.open(path, subdir=isdir, readonly=True, readahead=False)
-
-            # Retrive first sample to help recover proper types/shapes of ndarrays. 
-            # NOTE: We do not check if all the samples have the same type/shape
-            # since (a) we checked for it when saving the file and (b) it is more 
-            # efficient. However, if the file is modified in between saving and 
-            # loading (see https://w.wiki/GQE), this could lead to potential issues. 
-            # TODO: Do we check if all the samples have the same type/shape?
-            with self.db.begin() as txn, txn.cursor() as cursor:
-                self.keys = pkl.loads(cursor.get(b"__keys__"))
-                self.example = pkl.loads(cursor.get(self.keys[0]))
-
-        def __call__(self) -> Dict[str, np.ndarray]:
-            # Yield a dict with "arr_n" as the key and the ndarray as the value
-            with self.db.begin() as txn, txn.cursor() as cursor:
-                for key in self.keys:
-                    yield pkl.loads(cursor.get(key))
-
-        @property
-        def output_shapes(self) -> Dict[str, Tuple[int, ...]]:
-            """Defines the data shapes used to store the dataset.
-
-            Helps recover `np.ndarray`s types when loading into a 
-            `tf.data.Dataset` object using `from_generator()`.
-            """
-            return {key: np.array(arr).shape for key, arr in self.example.items()}
-
-        @property
-        def output_types(self) -> Dict[str, type]:
-            """Defines the data types used to store the dataset. 
-            
-            Helps recover `np.ndarray`s shapes when loading into a 
-            `tf.data.Dataset` object using `from_generator()`.
-            """
-            return {key: tf.float32 for key in self.example.keys()}
-
-    dsg = LMDBDatasetGenerator(path)
-    return tf.data.Dataset.from_generator(dsg, dsg.output_types, dsg.output_shapes)
+    db = lmdb.open(path, subdir=isdir, readonly=True, readahead=False)
+    with db.begin() as txn, txn.cursor() as cursor:
+        # Move axis representing num_samples (aka saved_axis) to first axis
+        saved_axis = pkl.loads(cursor.get(b"saved_axis"))
+        data_dict = {key.decode(): np.moveaxis(pkl.loads(cursor.get(key)), saved_axis, 0)
+                     for key in pkl.loads(cursor.get(b"__keys__"))}
+    return tf.data.Dataset.from_tensor_slices(data_dict)
 
 
 def TensorflowNumpyDataset(path: str) -> tf.data.Dataset:
@@ -238,9 +202,6 @@ class TorchHDF5Dataset(Dataset):
     """Parse (generic) HDF5 dataset into a `torch.utils.data.Dataset`
     object, which contains `torch.Tensor`s.
 
-    NOTE: Regardless of the format the data is saved in, the examples
-    are always concatenated vertically row-wise (aka first channel).
-
     NOTE: The HDF5 file must contain an attribute named "saved_axis"
     which represents the axis where the `num_samples` are saved.
 
@@ -268,11 +229,11 @@ class TorchHDF5Dataset(Dataset):
 
 
 class TorchLMDBDataset(Dataset):
-    """Parse (generic) LMDB dataset into a `torch.utils.data.Dataset` 
+    """Parse (generic) LMDB dataset into a `torch.utils.data.Dataset`
     object, which contains `torch.Tensor`s.
-    
-    NOTE: Regardless of the format the data is saved in, the examples 
-    are always concatenated vertically row-wise (aka first channel).
+
+    NOTE: The LMDB file must contain a key named "saved_axis" which
+    represents the axis where the `num_samples` are saved.
 
     Params:
     -------
@@ -281,7 +242,7 @@ class TorchLMDBDataset(Dataset):
     """
 
     def __init__(self, path: str):
-        # Check whether directory or full filename is provided. If dir, check 
+        # Check whether directory or full filename is provided. If dir, check
         # for "data.mdb" file within dir.
         isdir = os.path.isdir(path)
         if isdir:
@@ -291,22 +252,22 @@ class TorchLMDBDataset(Dataset):
         else:
             assert os.path.isfile(path), "LMDB file {} does not exist!".format(path)
 
-        self.db = lmdb.open(path, subdir=isdir, readonly=True, readahead=False)
-        with self.db.begin() as txn, txn.cursor() as cursor:
-            self.num_examples = txn.stat()['entries'] - 1
+        db = lmdb.open(path, subdir=isdir, readonly=True, readahead=False)
+        with db.begin() as txn, txn.cursor() as cursor:
+            self.saved_axis = pkl.loads(cursor.get(b"saved_axis"))
             self.keys = pkl.loads(cursor.get(b"__keys__"))
+            tensors = [torch.from_numpy(pkl.loads(cursor.get(key)))
+                       for key in self.keys]
+        assert all(tensors[0].size(self.saved_axis) == tensor.size(self.saved_axis)
+                   for tensor in tensors)
+        self.tensors = dict(zip(self.keys, tensors))
 
     def __len__(self) -> int:
-        return self.num_examples
+        return self.tensors[self.keys[0]].size(self.saved_axis)
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        # Check for invalid indexing
-        if idx > self.num_examples:
-            raise IndexError(f"Index ({idx}) out of range (0-{self.num_examples})")
-        
-        with self.db.begin() as txn, txn.cursor() as cursor:
-            example = pkl.loads(cursor.get(self.keys[idx]))
-            return {key: torch.FloatTensor(arr) for key,arr in example.items()}
+        return {key.decode(): tensor[idx] if self.saved_axis == 0 else tensor[..., idx]
+                for key, tensor in self.tensors.items()}
 
 
 class TorchNumpyDataset(Dataset):
