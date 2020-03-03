@@ -12,8 +12,8 @@ import numpy as np
 import tensorflow as tf
 
 from tqdm import tqdm
+from tensorflow.data import Dataset as TFDataset
 from torch.utils.data import Dataset as TorchDataset
-from tensorflow.data import Dataset as TensorflowDataset
 
 from profit import backend as P
 from profit.utils.data_utils.datasets import TensorflowHDF5Dataset
@@ -117,7 +117,7 @@ class HDF5Serializer(InMemorySerializer):
 
     @staticmethod
     def load(path: str, as_numpy: bool = False) -> Union[np.ndarray, \
-            List[np.ndarray], TensorflowDataset, TorchDataset]:
+            List[np.ndarray], TFDataset, TorchDataset]:
         """Load the dataset.
 
         Params:
@@ -241,8 +241,8 @@ class LMDBSerializer(LazySerializer):
 
 
     @staticmethod
-    def load(path: str, as_numpy: bool=False) -> Union[List[np.ndarray], \
-            np.ndarray, TorchDataset, TensorflowDataset]:
+    def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, \
+            List[np.ndarray], TFDataset, TorchDataset]:
         """Load the dataset.
         
         Params:
@@ -351,8 +351,8 @@ class NumpySerializer(InMemorySerializer):
         
 
     @staticmethod
-    def load(path: str, as_numpy: bool=False) -> Union[List[np.ndarray], \
-            np.ndarray, TorchDataset, TensorflowDataset]:
+    def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, \
+            List[np.ndarray], TFDataset, TorchDataset]:
         """Load the dataset.
         
         Params:
@@ -530,7 +530,7 @@ class TFRecordsSerializer(LazySerializer):
 
     @staticmethod
     def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, \
-            List[np.ndarray], TorchDataset, TensorflowDataset]:
+            List[np.ndarray], TFDataset, TorchDataset]:
         """Load the dataset.
 
         Assumes that each np.ndarray is saved under default names 
