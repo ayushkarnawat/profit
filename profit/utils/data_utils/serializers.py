@@ -50,7 +50,7 @@ class InMemorySerializer(BaseSerializer, ABC):
     def save(data: Any, path: str, **kwargs: Dict[str, Any]) -> None:
         """Save the data to file."""
         raise NotImplementedError
-    
+
     @staticmethod
     @abstractmethod
     def load(path: str, as_numpy: bool = False) -> Any:
@@ -77,7 +77,7 @@ class LazySerializer(BaseSerializer, ABC):
 class HDF5Serializer(InMemorySerializer):
     """Serialize ndarray's to HDF5 file.
 
-    Note that HDF5 files are not that performant and do not (currently) 
+    Note that HDF5 files are not that performant and do not (currently)
     support lazy loading. It is better to use :class:`LMDBSerializer`.
     """
 
@@ -126,14 +126,14 @@ class HDF5Serializer(InMemorySerializer):
             HDF5 file which contains dataset.
 
         as_numpy: bool, default=False
-            If True, loads the dataset as a list of np.ndarray's (in 
-            its original form). If False, loads the dataset in  
+            If True, loads the dataset as a list of np.ndarray's (in
+            its original form). If False, loads the dataset in
             P.backend()'s specified format.
 
         Returns:
         --------
         data: np.ndarray, torch.utils.data.Dataset, or tf.data.Dataset
-            The dataset (either in its original shape/format or in 
+            The dataset (either in its original shape/format or in
             P.backend()'s specified format).
         """
         if as_numpy:
@@ -149,15 +149,15 @@ class HDF5Serializer(InMemorySerializer):
 
 class LMDBSerializer(LazySerializer):
     """Serialize ndarray's to a LMDB database.
-    
+
     The keys are idxs, and the values are the list of serialized ndarrays.
     """
 
     @staticmethod
-    def save(data: Union[np.ndarray, List[np.ndarray]], path: str, 
-             write_frequency: int=1) -> None:
+    def save(data: Union[np.ndarray, List[np.ndarray]], path: str,
+             write_frequency: int = 1) -> None:
         """Save data to .lmdb/.mdb file.
-        
+
         Params:
         -------
         data: np.ndarray or list of np.ndarray
@@ -167,21 +167,19 @@ class LMDBSerializer(LazySerializer):
             Output LMDB directory or file.
 
         write_frequence: int, default=1
-            The frequency to write back data to disk. Smaller value 
+            The frequency to write back data to disk. Smaller value
             reduces memory usage, at the cost of performance.
         """
         if isinstance(data, np.ndarray):
             data = [data]
 
         # Check for same num of examples in the multiple ndarray's
-        shapes = [arr.shape for arr in data]
         axis = 0 if P.data_format() == "batch_first" else -1
-        num_examples = [shape[axis] for shape in shapes]
-        if num_examples[1:] != num_examples[:-1]:
-            raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
-                f"(axis={axis}): {shapes} - is the data format correct?")
-        
-        # Check whether directory or full filename is provided. If dir, check 
+        assert all(data[0].shape[axis] == arr.shape[axis] for arr in data), \
+            (f"Unequal num of examples in {P.data_format()} (axis={axis}): "
+             f"{[arr.shape for arr in data]} - is the data format correct?")
+
+        # Check whether directory or full filename is provided. If dir, check
         # for "data.mdb" file within dir.
         isdir = os.path.isdir(path)
         if isdir:
@@ -193,9 +191,9 @@ class LMDBSerializer(LazySerializer):
         # It's OK to use super large map_size on Linux, but not on other platforms
         # See: https://github.com/NVIDIA/DIGITS/issues/206
         map_size = 1099511627776 * 2 if platform.system() == 'Linux' else 128 * 10**6
-        db = lmdb.open(path, subdir=isdir, map_size=map_size, readonly=False, 
+        db = lmdb.open(path, subdir=isdir, map_size=map_size, readonly=False,
                        meminit=False, map_async=True) # need sync() at the end
-        
+
         # Put data into lmdb, and doubling the size if full.
         # Ref: https://github.com/NVIDIA/DIGITS/pull/209/files
         def put_or_grow(txn, key, value):
@@ -207,33 +205,32 @@ class LMDBSerializer(LazySerializer):
             txn.abort()
             curr_size = db.info()['map_size']
             new_size = curr_size * 2
-            print("Doubling LMDB map_size to {0:.2f}GB.".format(new_size / 10**9))
+            print(f"Doubling LMDB map_size to {new_size / 10**9:.2f} GB.")
             db.set_mapsize(new_size)
             txn = db.begin(write=True)
             txn = put_or_grow(txn, key, value)
             return txn
-        
-        # NOTE: LMDB transaction is not exception-safe (even though it has a 
+
+        # NOTE: LMDB transaction is not exception-safe (even though it has a
         # context manager interface).
-        n_examples = num_examples[0]
         txn = db.begin(write=True)
-        for idx in tqdm(range(n_examples), total=n_examples):
-            example = {f"arr_{i}":arr[idx].tolist() if P.data_format() == "batch_first" 
-                       else arr[...,idx].tolist() for i,arr in enumerate(data)}
-            txn = put_or_grow(txn, key=u'{:08}'.format(idx).encode('ascii'), 
-                              value=pkl.dumps(example, protocol=-1))
-            # NOTE: If we do not commit some examples before the db grows, 
-            # those samples do not get saved. As such, for robustness, we 
-            # choose write_frequency=1 (at the cost of performance).
+        for idx, arr in enumerate(data):
+            key = f"arr_{idx}".encode('ascii')
+            txn = put_or_grow(txn, key=key, value=pkl.dumps(arr, protocol=-1))
+            # NOTE: If we do not commit some ndarrays before the db grows,
+            # those do not get saved. As such, for robustness, we choose
+            # write_frequency=1 (at the cost of performance).
             if (idx + 1) % write_frequency == 0:
                 txn.commit()
                 txn = db.begin(write=True)
-        txn.commit() # commit all remaining serialized examples
-        
-        # Add all keys used (in this case it is just the idxs)
-        keys = [u'{:08}'.format(k).encode('ascii') for k in range(n_examples)]
+        txn.commit() # commit all remaining serialized ndarrays
+
+        # Add all keys used (in this case it is just the array names) and axis
+        # where num_samples is represented
+        keys = [f'arr_{idx}'.encode('ascii') for idx in range(len(data))]
         with db.begin(write=True) as txn:
             txn = put_or_grow(txn, key=b'__keys__', value=pkl.dumps(keys, protocol=-1))
+            txn = put_or_grow(txn, key=b'saved_axis', value=pkl.dumps(axis, protocol=-1))
 
         print("Flushing database ...")
         db.sync()
@@ -244,24 +241,24 @@ class LMDBSerializer(LazySerializer):
     def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, \
             List[np.ndarray], TFDataset, TorchDataset]:
         """Load the dataset.
-        
+
         Params:
         -------
         path: str
             LMDB file which contains dataset.
 
         as_numpy: bool, default=False
-            If True, loads the dataset as a list of np.ndarray's (in 
-            its original form). If False, loads the dataset in  
+            If True, loads the dataset as a list of np.ndarray's (in
+            its original form). If False, loads the dataset in
             P.backend()'s specified format.
 
         Returns:
         --------
         data: np.ndarray, torch.utils.data.Dataset, or tf.data.Dataset
-            The dataset (either in its original shape/format or in 
+            The dataset (either in its original shape/format or in
             P.backend()'s specified format).
         """
-        # Check whether directory or full filename is provided. If dir, check 
+        # Check whether directory or full filename is provided. If dir, check
         # for "data.mdb" file within dir.
         isdir = os.path.isdir(path)
         if isdir:
@@ -270,27 +267,14 @@ class LMDBSerializer(LazySerializer):
                 "not exist!".format(default_path)
         else:
             assert os.path.isfile(path), "LMDB file {} does not exist!".format(path)
-        
+
         if as_numpy:
+            out_axis = 0 if P.data_format() == "batch_first" else -1
             db = lmdb.open(path, subdir=isdir, readonly=True)
-            dataset_dict = {}
-            axis = 0 if P.data_format() == "batch_first" else -1
             with db.begin() as txn, txn.cursor() as cursor:
-                for key in pkl.loads(cursor.get(b"__keys__")):
-                    example = pkl.loads(cursor.get(key))
-                    for name, arr in example.items():
-                        arr = np.array(arr)
-                        newshape = [1] + list(arr.shape) if P.data_format() == \
-                            "batch_first" else list(arr.shape) + [1]
-                        reshaped = np.reshape(arr, newshape=newshape)
-                        # Concatenate individual examples together into one ndarray.
-                        if name not in dataset_dict.keys():
-                            dataset_dict[name] = reshaped
-                        else:
-                            dataset_dict[name] = np.concatenate((dataset_dict.get(name), \
-                                reshaped), axis=axis)
-            # Extract np.ndarray's from dict and return in its original form
-            data = [arr for arr in dataset_dict.values()]
+                saved_axis = pkl.loads(cursor.get(b"saved_axis"))
+                data = [np.moveaxis(pkl.loads(cursor.get(key)), saved_axis, out_axis)
+                        for key in pkl.loads(cursor.get(b"__keys__"))]
             return data[0] if len(data) == 1 else data
         return TorchLMDBDataset(path) if P.backend() == "pytorch" \
             else TensorflowLMDBDataset(path)
