@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 
-# Type of float to use throughout the session.
+# Type of format to use throughout the session.
 _DATA_FORMAT = 'batch_first'
 
 

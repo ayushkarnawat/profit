@@ -124,6 +124,9 @@ class HDF5Serializer(InMemorySerializer):
         if isinstance(data, np.ndarray):
             data = [data]
 
+        # Convert np.ndarray's dtype to their 32 counterparts
+        data = [arr.astype(arr.dtype.kind) for arr in data]
+
         # Check for same num of examples in the multiple ndarray's
         axis = 0 if P.data_format() == "batch_first" else -1
         assert all(data[0].shape[axis] == arr.shape[axis] for arr in data), \
@@ -195,6 +198,9 @@ class LMDBSerializer(LazySerializer):
         """
         if isinstance(data, np.ndarray):
             data = [data]
+
+        # Convert np.ndarray's dtype to their 32 counterparts
+        data = [arr.astype(arr.dtype.kind) for arr in data]
 
         # Check for same num of examples in the multiple ndarray's
         axis = 0 if P.data_format() == "batch_first" else -1
@@ -329,6 +335,9 @@ class NumpySerializer(InMemorySerializer):
         """
         if isinstance(data, np.ndarray):
             data = [data]
+
+        # Convert np.ndarray's dtype to their 32 counterparts
+        data = [arr.astype(arr.dtype.kind) for arr in data]
 
         # Check for same num of examples in the multiple ndarray's
         axis = 0 if P.data_format() == "batch_first" else -1
@@ -466,6 +475,9 @@ class TFRecordsSerializer(LazySerializer):
 
         if isinstance(data, np.ndarray):
             data = [data]
+
+        # Convert np.ndarray's dtype to their 32 counterparts
+        data = [arr.astype(arr.dtype.kind) for arr in data]
 
         # Check for same num of examples in the multiple ndarray's
         axis = 0 if P.data_format() == "batch_first" else -1

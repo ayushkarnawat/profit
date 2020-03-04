@@ -7,7 +7,7 @@ from data import load_dataset
 
 
 # Preprocess + load the dataset
-data = load_dataset('egcn', 'tertiary', labels='Fitness', num_data=50,
+data = load_dataset('egcn', 'tertiary', labels='Fitness', num_data=5,
                     filetype='mdb', as_numpy=False)
 
 if P.backend() == "pytorch":
@@ -22,9 +22,9 @@ if P.backend() == "pytorch":
     # TODO: Use a stratified sampler to split the target labels equally into each
     # subset. That is, both the train and validation datasets will have the same
     # ratio of low/mid/high fitness variants as the full dataset in each batch.
-    # See: https://discuss.pytorch.org/t/dataloader-using-subsetrandomsampler-and-weightedrandomsampler-at-the-same-time/29907/2
+    # See: https://discuss.pytorch.org/t/29907/2
     _dataset = torch.Tensor(len(data), 1) # hack to allow splitting to work properly
-    _labels = [data[idx]['arr_3'].item() for idx in range(len(data))] # this op is (ANNOYINGLY) slow
+    _labels = data[:]['arr_3'].view(-1).tolist()
     # Create subset indicies
     train_idx, val_idx = split_method_dict['stratified']().train_valid_split(
         _dataset, labels=_labels, frac_train=0.8, frac_val=0.2, return_idxs=True,
@@ -46,8 +46,8 @@ if P.backend() == "pytorch":
 
     # Init callbacks
     stop_clbk = EarlyStopping(patience=2, verbose=1)
-    save_clbk = ModelCheckpoint("results/3gb1/egcn_fitness/", verbose=1, 
-                                save_weights_only=True, prefix="round0")
+    save_clbk = ModelCheckpoint("results/3gb1/egcn_fitness/", verbose=1,
+                                save_weights_only=True, prefix="cohort0")
     # Cumbersome, but required to ensure weights get saved properly.
     # How do we ensure that the model (and its updated weights) are being used
     # everytime we are sampling the new batch?
@@ -59,7 +59,7 @@ if P.backend() == "pytorch":
 
     print('Training...')
     # PSEUDOCODE: Until the convergeg criteria is not met: i.e. acqusition func. didn't change
-    # PSEUDOCODE: Update the prefix in the model saving such that it is round{idx}
+    # PSEUDOCODE: Update the prefix in the model saving such that it is cohort/design{idx}
     for epoch in range(5):
         # Training loop
         model.train()
