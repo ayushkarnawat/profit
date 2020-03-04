@@ -43,6 +43,7 @@ def tfrecord_iterator(data_path: str, index_path: Optional[str]=None,
     datum_bytes = bytearray(1024*1024)
 
     def read_records(start_offset=None, end_offset=None):
+        nonlocal length_bytes, crc_bytes, datum_bytes
         if start_offset is not None:
             file.seek(start_offset)
         if end_offset is None:
@@ -53,8 +54,9 @@ def tfrecord_iterator(data_path: str, index_path: Optional[str]=None,
             if file.readinto(crc_bytes) != 4:
                 raise RuntimeError("Failed to read the start token.")
             length, = struct.unpack("<Q", length_bytes)
+            # Grow datum_bytes (at 1.5x) if default size is not enough to read record
             if length > len(datum_bytes):
-                datum_bytes.zfill(int(length * 1.5))
+                datum_bytes = datum_bytes.zfill(int(length * 1.5))
             datum_bytes_view = memoryview(datum_bytes)[:length]
             if file.readinto(datum_bytes_view) != length:
                 raise RuntimeError("Failed to read the record.")
