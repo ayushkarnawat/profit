@@ -9,12 +9,12 @@ import numpy as np
 from profit.utils.data_utils import example_pb2
 
 
-def tfrecord_iterator(data_path: str, index_path: Optional[str]=None, 
-                      shard: Optional[Tuple[int, int]]=None) -> Iterable[memoryview]:
+def tfrecord_iterator(data_path: str, index_path: Optional[str] = None,
+                      shard: Optional[Tuple[int, int]] = None) -> Iterable[memoryview]:
     """Create an iterator over the tfrecord dataset.
 
-    Since the tfrecords file stores each example as bytes, we can 
-    define an iterator over `datum_bytes_view`, which is a memoryview 
+    Since the tfrecords file stores each example as bytes, we can
+    define an iterator over `datum_bytes_view`, which is a memoryview
     object referencing the bytes.
 
     Params:
@@ -24,16 +24,16 @@ def tfrecord_iterator(data_path: str, index_path: Optional[str]=None,
 
     index_path: str, optional, default=None
         Index file path. Can be set to None if no file is available.
-    
+
     shard: tuple of ints, optional, default=None
-        A tuple (index, count) representing worker_id and num_workers 
-        count. Necessary to evenly split/shard the dataset among many  
+        A tuple (index, count) representing worker_id and num_workers
+        count. Necessary to evenly split/shard the dataset among many
         workers (i.e. >1).
-    
+
     Yields:
     -------
     datum_bytes_view: memoryview
-        Object referencing the specified `datum_bytes` contained in the 
+        Object referencing the specified `datum_bytes` contained in the
         file (for a single record).
     """
     file = io.open(data_path, "rb")
@@ -65,13 +65,13 @@ def tfrecord_iterator(data_path: str, index_path: Optional[str]=None,
             yield datum_bytes_view
 
     if index_path is None:
-        warnings.warn(f"Could not find index associated with '{data_path}' - " + 
-            "data sharding will be unavailable! \033[93mNOTE\033[0m: Using " + 
-            "num_workers > 1 in `torch.utils.data.DataLoader()` might yield " + 
-            "duplicate data!")
+        warnings.warn(f"Could not find index associated with '{data_path}' - " +
+                      "data sharding will be unavailable! \033[93mNOTE\033[0m: " +
+                      "Using num_workers > 1 in `torch.utils.data.DataLoader()` " +
+                      "might yield duplicate data!")
         yield from read_records()
     else:
-        index = np.loadtxt(index_path, dtype=np.int64)[:,0]
+        index = np.loadtxt(index_path, dtype=np.int64)[:, 0]
         if shard is None:
             offset = np.random.choice(index)
             yield from read_records(offset)
@@ -87,32 +87,32 @@ def tfrecord_iterator(data_path: str, index_path: Optional[str]=None,
     file.close()
 
 
-def tfrecord_loader(data_path: str, index_path: Optional[str], 
-                    shard: Optional[Tuple[int, int]]=None) \
+def tfrecord_loader(data_path: str, index_path: Optional[str] = None,
+                    shard: Optional[Tuple[int, int]] = None) \
                     -> Iterable[Dict[str, np.ndarray]]:
-    """Create an iterator over the (decoded) examples contained within 
-    the dataset. 
-    
-    Decodes the raw bytes of the features (contained within the 
+    """Create an iterator over the (decoded) examples contained within
+    the dataset.
+
+    Decodes the raw bytes of the features (contained within the
     dataset) into its respective format.
 
     Params:
     -------
     data_path: str
         TFRecord file path.
-    
+
     index_path: str, optional, default=None
         Index file path. Can be set to None if no file is available.
 
     shard: tuple of ints, optional, default=None
-        A tuple (index, count) representing worker_id and num_workers 
-        count. Necessary to evenly split/shard the dataset among many  
+        A tuple (index, count) representing worker_id and num_workers
+        count. Necessary to evenly split/shard the dataset among many
         workers (i.e. >1).
-    
+
     Yields:
     -------
     features: dict of {str, np.ndarray}
-        Decoded bytes of the features into its respective data type 
+        Decoded bytes of the features into its respective data type
         (for an individual record).
     """
     record_iterator = tfrecord_iterator(data_path, index_path, shard)
@@ -123,7 +123,7 @@ def tfrecord_loader(data_path: str, index_path: Optional[str],
 
         features = {}
         for key in list(example.features.feature.keys()):
-            # NOTE: We assume that each key in the example has only one field 
+            # NOTE: We assume that each key in the example has only one field
             # (either "bytes_list", "float_list", or "int64_list")!
             field = example.features.feature[key].ListFields()[0]
             tf_typename, value = field[0].name, field[1].value

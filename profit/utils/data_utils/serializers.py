@@ -1,3 +1,26 @@
+"""Create serialized representations of np.ndarrays into specified
+filetypes (HDF5, LMDB, NP, TFRecords).
+
+For HDF5, LMDB, and NP files, each ndarray gets saved in its own key
+under default names `arr_0`, ..., `arr_n`. For TFRecord files, each
+record (aka row/col in the ndarrays) is serialized into its own key.
+
+This is done for performance reasons. When loading the dataset (either
+into `torch.utils.data.Dataset` or `tf.data.Dataset` objects), it is
+significantly faster to query each array and slice them as tensors
+rather than load each individual example and concatenate them.
+
+TODO: Perhaps, if the number of ndarrays to be saved is large, then the
+opposite might be true. However, since this requires further testing,
+let's leave that discussion for another day.
+
+TODO: Should TFRecords files also just save each ndarray into its own
+key rather than each example begin serialized individually? This might
+not work when attempting to append new examples into the file, since we
+will have to ensure that each record has the same shape as the previous
+example(s).
+"""
+
 import os
 import struct
 import platform
@@ -356,24 +379,24 @@ class NumpySerializer(InMemorySerializer):
 
 class TFRecordsSerializer(LazySerializer):
     """Serialize np.ndarray's to bytes and write to TFRecords file.
-    
-    Note that TFRecords does not support random access and is in fact 
+
+    Note that TFRecords does not support random access and is in fact
     not very performant. It's better to use :class:`LMDBSerializer`.
     """
 
     @staticmethod
-    def save(data: Union[np.ndarray, List[np.ndarray]], path: str, 
-             save_index: bool=True) -> None:
+    def save(data: Union[np.ndarray, List[np.ndarray]], path: str,
+             save_index: bool = True) -> None:
         """Save data to .tfrecords file.
-        
-        Saves each np.ndarray under default names `arr_0`, ..., `arr_n` 
+
+        Saves each np.ndarray under default names `arr_0`, ..., `arr_n`
         and its associated shapes as `shape_0`, ..., `shape_n`.
 
-        NOTE: TFRecords flatten each ndarray before saving them as a 
-        bytes_list feature (thus losing array's shape metadata). To 
-        combat this, we save each ndarray's shape dims (as int64_list 
+        NOTE: TFRecords flatten each ndarray before saving them as a
+        bytes_list feature (thus losing array's shape metadata). To
+        combat this, we save each ndarray's shape dims (as int64_list
         feature) and reshape them accordingly when loading.
-        
+
         Params:
         -------
         data: np.ndarray or list of np.ndarray
@@ -383,7 +406,7 @@ class TFRecordsSerializer(LazySerializer):
             Output TFRecords file.
 
         save_index: bool, default=True
-            If True, saves an index of records. If False, no index is 
+            If True, saves an index of records. If False, no index is
             created.
         """
         def _bytes_feature(value: Union[str, bytes]) -> tf.train.Feature:
@@ -414,13 +437,11 @@ class TFRecordsSerializer(LazySerializer):
             return example_proto.SerializeToString()
 
         def _create_idx(tfrecord_file: path, index_file: path) -> None:
-            """Create index of TFRecords file. 
-            
-            The rows (contained within the file) indicates the num of 
-            examples in the dataset. The last column indicates how many 
-            bytes of storage each example takes. 
-            
-            Taken from https://git.io/JvGMw.
+            """Create index of TFRecords file. See https://git.io/JvGMw.
+
+            The rows (contained within the file) indicates the num of
+            examples in the dataset. The last column indicates how many
+            bytes of storage each example takes.
             """
             infile = open(tfrecord_file, "rb")
             outfile = open(index_file, "w")
@@ -436,7 +457,7 @@ class TFRecordsSerializer(LazySerializer):
                     infile.read(proto_len)
                     infile.read(4)
                     outfile.write(str(current) + " " + str(infile.tell() - current) + "\n")
-                except:
+                except Exception:
                     print("Failed to parse TFRecord.")
                     break
 
@@ -447,17 +468,15 @@ class TFRecordsSerializer(LazySerializer):
             data = [data]
 
         # Check for same num of examples in the multiple ndarray's
-        shapes = [arr.shape for arr in data]
         axis = 0 if P.data_format() == "batch_first" else -1
-        num_examples = [shape[axis] for shape in shapes]
-        if num_examples[1:] != num_examples[:-1]:
-            raise AssertionError(f"Unequal num of examples in {P.data_format()} " +
-                f"(axis={axis}): {shapes} - is the data format correct?")
+        assert all(data[0].shape[axis] == arr.shape[axis] for arr in data), \
+            (f"Unequal num of examples in {P.data_format()} (axis={axis}): "
+             f"{[arr.shape for arr in data]} - is the data format correct?")
 
-        # Add shapes of each array in the dataset (for a single example). Hack 
+        # Add shapes of each array in the dataset (for a single example). Hack
         # to allow serialized data to be reshaped properly when loaded.
-        shapes = {f"shape_{idx}": np.array(arr.shape[1:]) if P.data_format() == "batch_first" 
-                  else np.array(arr.shape[:-1]) for idx, arr in enumerate(data)}
+        shapes = {f"shape_{idx}": np.delete(arr.shape, axis)
+                  for idx, arr in enumerate(data)}
         dataset = {f"arr_{idx}": arr for idx, arr in enumerate(data)}
         dataset.update(shapes)
 
@@ -465,8 +484,8 @@ class TFRecordsSerializer(LazySerializer):
         n_examples = data[0].shape[axis]
         with tf.io.TFRecordWriter(path) as writer:
             for row in tqdm(range(n_examples), total=n_examples):
-                # NOTE: tobytes() flattens an ndarray. We have to flatten it 
-                # because tf _bytes_feature() only takes in bytes. To combat 
+                # NOTE: tobytes() flattens an ndarray. We have to flatten it
+                # because tf _bytes_feature() only takes in bytes. To combat
                 # this, we save each ndarray's shape as well (see above).
                 example = {}
                 for key, arr in dataset.items():
@@ -475,41 +494,41 @@ class TFRecordsSerializer(LazySerializer):
                         example[key] = {"data": arr, "_type": _int64_feature}
                     else:
                         example[key] = {"data": arr[row].tobytes() if P.data_format() \
-                            == "batch_first" else arr[...,row].tobytes(), 
+                            == "batch_first" else arr[..., row].tobytes(),
                                         "_type": _bytes_feature}
                 writer.write(_serialize(example))
 
         # Write index of the examples
-        # NOTE: It's recommended to create an index file for each TFRecord file. 
-        # Index file must be provided when using multiple workers, otherwise the 
-        # loader may return duplicate records if using multiple workers.
+        # NOTE: It's recommended to create an index file for each TFRecord file.
+        # Index file must be provided when using multiple workers, otherwise the
+        # loader may return duplicate records.
         if save_index:
             _create_idx(tfrecord_file=path, index_file=f"{path}_idx")
 
 
     @staticmethod
-    def load(path: str, as_numpy: bool=False) -> Union[np.ndarray, \
+    def load(path: str, as_numpy: bool = False) -> Union[np.ndarray, \
             List[np.ndarray], TFDataset, TorchDataset]:
         """Load the dataset.
 
-        Assumes that each np.ndarray is saved under default names 
-        `arr_0`, ..., `arr_n` and its associated shapes as `shape_0`, 
-        ..., `shape_n`.
-        
+        Assumes that each record's np.ndarrays are saved under default
+        names `arr_0`, ..., `arr_n` and its associated shapes as
+        `shape_0`, ..., `shape_n`.
+
         Params:
         -------
         path: str
             TFRecords file which contains the dataset.
 
         as_numpy: bool, default=False
-            If True, loads the dataset as a list of np.ndarray's (in 
-            its original form). If False, loads the dataset in  
+            If True, loads the dataset as a list of np.ndarray's (in
+            its original form). If False, loads the dataset in
             P.backend()'s specified format.
 
         Returns:
         --------
         data: np.ndarray, torch.utils.data.Dataset, or tf.data.Dataset
-            The dataset (either in its original shape/format or in 
+            The dataset (either in its original shape/format or in
             P.backend()'s specified format).
         """
         # Parse serialized records into correctly shaped tensors/ndarray's
@@ -520,7 +539,7 @@ class TFRecordsSerializer(LazySerializer):
                 example = tf.train.Example()
                 example.ParseFromString(serialized)
                 # Save array shapes to ensure respective ndarrays get reshaped properly
-                shapes = {name: list(example.features.feature[name].int64_list.value) 
+                shapes = {name: list(example.features.feature[name].int64_list.value)
                           for name in example.features.feature.keys() if name.startswith("shape")}
                 for name, tf_feature in example.features.feature.items():
                     if name.startswith("arr"):
@@ -536,7 +555,8 @@ class TFRecordsSerializer(LazySerializer):
                             dataset_dict[name] = np.concatenate((dataset_dict.get(name), \
                                 reshaped), axis=axis)
             # Extract np.ndarray's from dict and return in its original form
-            data = [arr for arr in dataset_dict.values()]
+            data = dataset_dict.values()
             return data[0] if len(data) == 1 else data
         return TorchTFRecordsDataset(path) if P.backend() == "pytorch" \
             else TFRecordsDataset(path)
+        

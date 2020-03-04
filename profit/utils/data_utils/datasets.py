@@ -101,9 +101,9 @@ def TensorflowNumpyDataset(path: str) -> tf.data.Dataset:
 
 
 def TFRecordsDataset(path: str) -> tf.data.Dataset:
-    """Parse (generic) TFRecords file into a `tf.data.Dataset` object, 
+    """Parse (generic) TFRecords file into a `tf.data.Dataset` object,
     which contains `tf.Tensor`s.
-    
+
     Params:
     -------
     path: str
@@ -114,10 +114,10 @@ def TFRecordsDataset(path: str) -> tf.data.Dataset:
     dataset: tf.data.Dataset
         Dataset loaded into its `tf.data.Dataset` form.
     """
-    def _deserialize(serialized: tf.Tensor, features: Dict[str, tf.io.FixedLenFeature], 
+    def _deserialize(serialized: tf.Tensor, features: Dict[str, tf.io.FixedLenFeature],
                      **kwargs: Dict[str, List[int]]) -> Dict[str, Tuple[tf.Tensor, ...]]:
         """Deserialize an serialized example within the dataset.
-        
+
         Params:
         -------
         serialized: tf.Tensor with dtype `string``
@@ -131,21 +131,21 @@ def TFRecordsDataset(path: str) -> tf.data.Dataset:
                 shape = kwargs.get("shape_{}".format(name.split("_")[-1]))
                 tensors[name] = tf.reshape(tf.decode_raw(tensor, tf.float32), shape)
         return tensors
-    
-    # Determine what shapes each np.ndarray should be reshaped to. 
-    # Hack to allow saved flattened ndarray's to be reshaped properly. 
-    # NOTE: We could not properly convert each saved shape (which were 
-    # serialized as int64_lists and parsed as tf.Tensor) into lists so that 
-    # the ndarray's could be properly reshaped within _deserialize() above. 
+
+    # Determine what shapes each np.ndarray should be reshaped to.
+    # Hack to allow saved flattened ndarray's to be reshaped properly.
+    # NOTE: We could not properly convert each saved shape (which were
+    # serialized as int64_lists and parsed as tf.Tensor) into lists so that
+    # the ndarray's could be properly reshaped within _deserialize() above.
     serialized = next(tf.python_io.tf_record_iterator(path))
     example = tf.train.Example()
     example.ParseFromString(serialized)
-    shapes = {name: list(example.features.feature[name].int64_list.value) 
+    shapes = {name: list(example.features.feature[name].int64_list.value)
               for name in example.features.feature.keys() if name.startswith("shape")}
 
-    # Define a dict with the data names and types we expect to find in 
-    # the TFRecords file. It is a quite cumbersome that this needs to be 
-    # specified again, because it could have been written in the header 
+    # Define a dict with the data names and types we expect to find in
+    # the TFRecords file. It is a quite cumbersome that this needs to be
+    # specified again, because it could have been written in the header
     # of the TFRecords file instead.
     features = {}
     for name in example.features.feature.keys():
@@ -153,7 +153,7 @@ def TFRecordsDataset(path: str) -> tf.data.Dataset:
             # NOTE: Assuming all arr_i's are saved as bytes_list
             features[name] = tf.io.FixedLenFeature([], tf.string)
         elif name.startswith("shape"):
-            # NOTE: Assuming arr shape_i's are saved as int64_lists 
+            # NOTE: Assuming arr shape_i's are saved as int64_lists
             features[name] = tf.io.FixedLenFeature([], tf.int64)
         else:
             raise TypeError("Unknown dtype for {}.".format(name))
@@ -265,14 +265,14 @@ class TorchNumpyDataset(Dataset):
 
 
 class TorchTFRecordsDataset(IterableDataset):
-    """Parse (generic) tensorflow dataset into a `torch.utils.data.IterableDataset` 
+    """Parse (generic) tensorflow dataset into a `torch.utils.data.IterableDataset`
     object, which contains `torch.Tensor`s.
-    
-    NOTE: Uses example_pb2 to parse through the serialized records  
-    contained in the tfrecords file. This enables us to convert a 
-    tfrecords file to `torch.Tensor`s without the need to have the 
-    tf package installed. Useful down the line when we decouple the 
-    backends (aka not having one installed should not affect you ability 
+
+    NOTE: Uses example_pb2 to parse through the serialized records
+    contained in the tfrecords file. This enables us to convert a
+    tfrecords file to `torch.Tensor`s without the need to have the
+    tf package installed. Useful down the line when we decouple the
+    backends (aka not having one installed should not affect you ability
     to use the other backend).
 
     Params:
@@ -283,7 +283,7 @@ class TorchTFRecordsDataset(IterableDataset):
 
     def __init__(self, path: str):
         self.tfrecord_path = path
-        self.index_path = f"{path}_idx" if os.path.exists(f"{path}_idx") else None            
+        self.index_path = f"{path}_idx" if os.path.exists(f"{path}_idx") else None
 
     def __iter__(self) -> Dict[str, torch.Tensor]:
         # Shard/Chunk dataset if multiple workers are iterating over dataset
