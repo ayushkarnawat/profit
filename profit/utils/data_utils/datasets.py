@@ -36,6 +36,8 @@ def TensorflowHDF5Dataset(path: str) -> tf.data.Dataset:
         # Move axis representing num_samples (aka saved_axis) to first axis
         saved_axis = h5file.attrs.get("saved_axis")
         data_dict = {key: np.moveaxis(arr[:], saved_axis, 0) for key, arr in h5file.items()}
+        # Convert to dtype's 32 counterpart
+        data_dict = {k: v.astype(v.dtype.kind) for k, v in data_dict.items()}
     return tf.data.Dataset.from_tensor_slices(data_dict)
 
 
@@ -72,6 +74,8 @@ def TensorflowLMDBDataset(path: str) -> tf.data.Dataset:
         saved_axis = pkl.loads(cursor.get(b"saved_axis"))
         data_dict = {key.decode(): np.moveaxis(pkl.loads(cursor.get(key)), saved_axis, 0)
                      for key in pkl.loads(cursor.get(b"__keys__"))}
+        # Convert to dtype's 32 counterpart
+        data_dict = {k: v.astype(v.dtype.kind) for k, v in data_dict.items()}
     return tf.data.Dataset.from_tensor_slices(data_dict)
 
 
@@ -97,6 +101,8 @@ def TensorflowNumpyDataset(path: str) -> tf.data.Dataset:
         saved_axis = int(npzfile["saved_axis"])
         data_dict = {key: np.moveaxis(npzfile[key], saved_axis, 0)
                      for key in npzfile["__keys__"]}
+        # Convert to dtype's 32 counterpart
+        data_dict = {k: v.astype(v.dtype.kind) for k, v in data_dict.items()}
     return tf.data.Dataset.from_tensor_slices(data_dict)
 
 
@@ -180,7 +186,7 @@ class TorchHDF5Dataset(Dataset):
         with h5py.File(path, "r") as h5file:
             self.saved_axis = h5file.attrs.get("saved_axis")
             self.keys = list(h5file.keys())
-            tensors = [torch.FloatTensor(arr[:]) for arr in h5file.values()]
+            tensors = [torch.Tensor(arr[:]) for arr in h5file.values()]
         assert all(tensors[0].size(self.saved_axis) == tensor.size(self.saved_axis)
                    for tensor in tensors)
         self.tensors = dict(zip(self.keys, tensors))
@@ -221,7 +227,7 @@ class TorchLMDBDataset(Dataset):
         with db.begin() as txn, txn.cursor() as cursor:
             self.saved_axis = pkl.loads(cursor.get(b"saved_axis"))
             self.keys = pkl.loads(cursor.get(b"__keys__"))
-            tensors = [torch.from_numpy(pkl.loads(cursor.get(key)))
+            tensors = [torch.Tensor(pkl.loads(cursor.get(key)))
                        for key in self.keys]
         assert all(tensors[0].size(self.saved_axis) == tensor.size(self.saved_axis)
                    for tensor in tensors)
@@ -251,7 +257,7 @@ class TorchNumpyDataset(Dataset):
         with np.load(path, allow_pickle=False) as npzfile:
             self.saved_axis = int(npzfile["saved_axis"])
             self.keys = list(npzfile["__keys__"])
-            tensors = [torch.from_numpy(npzfile[key]) for key in self.keys]
+            tensors = [torch.Tensor(npzfile[key]) for key in self.keys]
         assert all(tensors[0].size(self.saved_axis) == tensor.size(self.saved_axis)
                    for tensor in tensors)
         self.tensors = dict(zip(self.keys, tensors))
@@ -300,6 +306,6 @@ class TorchTFRecordsDataset(IterableDataset):
             example = {}
             for key, value in record.items():
                 if key.startswith("arr"):
-                    shape = record.get("shape_{}".format(key.split("_")[-1]))
-                    example[key] = np.reshape(value, newshape=shape)
+                    shape = tuple(record.get("shape_{}".format(key.split("_")[-1])))
+                    example[key] = torch.reshape(torch.Tensor(value), shape)
             yield example
