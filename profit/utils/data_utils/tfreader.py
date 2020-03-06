@@ -130,7 +130,7 @@ def tfrecord_loader(data_path: str, index_path: Optional[str] = None,
 
             # Decode raw bytes into respective data types
             if tf_typename == "bytes_list":
-                value = np.frombuffer(value[0])
+                value = np.frombuffer(value[0], dtype=np.float32)
             elif tf_typename == "float_list":
                 value = np.array(value, dtype=np.float32)
             elif tf_typename == "int64_list":
