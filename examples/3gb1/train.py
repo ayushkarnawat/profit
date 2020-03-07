@@ -47,7 +47,7 @@ if P.backend() == "pytorch":
     # Init callbacks
     stop_clbk = EarlyStopping(patience=2, verbose=1)
     save_clbk = ModelCheckpoint("results/3gb1/egcn_fitness/", verbose=1,
-                                save_weights_only=True, prefix="cohort0")
+                                save_weights_only=True, prefix="design0")
     # Cumbersome, but required to ensure weights get saved properly.
     # How do we ensure that the model (and its updated weights) are being used
     # everytime we are sampling the new batch?
@@ -59,7 +59,7 @@ if P.backend() == "pytorch":
 
     print('Training...')
     # PSEUDOCODE: Until the convergeg criteria is not met: i.e. acqusition func. didn't change
-    # PSEUDOCODE: Update the prefix in the model saving such that it is cohort/design{idx}
+    # PSEUDOCODE: Update the prefix in the model saving such that it is design{idx}
     for epoch in range(5):
         # Training loop
         model.train()

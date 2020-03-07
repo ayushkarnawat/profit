@@ -1098,7 +1098,8 @@ class EmbeddedGCN(nn.Module):
         # Gather layer
         self.gather = GraphGather(pooling="max")
         # Fully connected layers
-        # NOTE: Applies dense connected layer to each coord (dim=1) of vector features (sample, coord_dim, n_filters/atom_feats)
+        # NOTE: Applies dense connected layer to each coordinate (across dim=1)
+        # of vector features (sample, coord_dim, n_filters/atom_feats).
         self.s_dense = nn.Linear(units_dense, units_dense)
         self.v_dense = nn.Linear(units_dense, units_dense)
         # Flatten layer
