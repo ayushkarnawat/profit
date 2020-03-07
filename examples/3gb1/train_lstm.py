@@ -3,9 +3,9 @@
 import torch
 from torch.utils.data import DataLoader, Subset
 
-from profit import backend as P
 from profit.dataset.splitters import split_method_dict
 from profit.models.pytorch.lstm import LSTMModel
+from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
 from profit.utils.training_utils.pytorch.optimizers import AdamW
 from profit.utils.training_utils.pytorch.callbacks import EarlyStopping
 from profit.utils.training_utils.pytorch.callbacks import ModelCheckpoint
@@ -37,12 +37,9 @@ train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=64, shuffle=True)
 
 # Initialize model
-# We have to use max_value because nn.Embeddings multiplies the value in each
-# example by the index in the embedding matrix. Additionally, the idx must
-# be from 0 -> max_value (hence why we have to +1).
-max_value = int(torch.max(data[:]["arr_0"])) + 1
-model = LSTMModel(max_value, input_size=64, hidden_size=512, num_hidden_layers=3,
-                  hidden_dropout=0.3)
+vocab_size = AminoAcidTokenizer("iupac1").vocab_size
+model = LSTMModel(vocab_size, input_size=64, hidden_size=256, num_hidden_layers=3,
+                  hidden_dropout=0.1)
 
 # Init callbacks
 stop_clbk = EarlyStopping(patience=2, verbose=1)
