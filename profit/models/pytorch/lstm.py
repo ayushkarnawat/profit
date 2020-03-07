@@ -2,6 +2,7 @@
 
 from typing import Optional, Tuple, Union
 
+import torch
 from torch import nn, Tensor
 from torch.nn import init
 from torch.nn import functional as F
@@ -191,15 +192,15 @@ class LSTMEncoder(nn.Module):
             sequence_lengths = input_mask.sum(1)
             reversed_sequence = []
             for seq, seqlen in zip(sequence, sequence_lengths):
-                idx = torch.arange(seqlen - 1, -1, -1, device=seq.device)
+                idx = torch.arange(seqlen - 1, -1, -1, device=seq.device, dtype=torch.int64)
                 seq = seq.index_select(0, idx)
-                seq = F.pad(seq, [0, 0, 0, sequence.size(1) - seqlen])
+                seq = F.pad(seq, [0, 0, 0, sequence.size(1) - int(seqlen)])
                 reversed_sequence.append(seq)
             reversed_sequence = torch.stack(reversed_sequence, 0)
         return reversed_sequence
 
 
-class ProteinLSTMModel(nn.Module):
+class LSTMModel(nn.Module):
     """LSTM model for protein-related tasks.
 
     Params:
@@ -237,7 +238,7 @@ class ProteinLSTMModel(nn.Module):
                  num_outputs: int = 1,
                  hidden_dropout: float = 0.1,
                  return_hs: bool = False) -> None:
-        super(ProteinLSTMModel, self).__init__()
+        super(LSTMModel, self).__init__()
         self.embed_matrix = nn.Embedding(vocab_size, input_size)
         self.encoder = LSTMEncoder(input_size, hidden_size, num_hidden_layers,
                                    hidden_dropout, return_hs)
@@ -261,18 +262,16 @@ class ProteinLSTMModel(nn.Module):
         self.apply(_init_weights)
 
     def forward(self, inputs: Tensor,
-                input_mask: Optional[Tensor] = None) -> Union[Tensor, Tuple[Tensor, Tuple[Tensor, ...]]]:
+                input_mask: Optional[Tensor] = None
+                ) -> Union[Tensor, Tuple[Tensor, Tuple[Tensor, ...]]]:
+        """Computation performed at every call."""
         if input_mask is None:
             input_mask = torch.ones_like(inputs)
 
-        # fp16 compatibility
+        inputs = inputs.long() # nn.Embedding only works with LongTensors
         embedding_output = self.embed_matrix(inputs)
-        # print(embedding_output.size())
         encoded = self.encoder(embedding_output, input_mask=input_mask)
         pooled_outputs = self.pooler(encoded[1])
-
-        # TODO: Address whether or not to output the hidden_states based on the
-        # parameter defined in init above.
 
         # NOTE: The (general) output below is used to store the sequence and
         # pooled representations after a forward pass through the model.
@@ -281,25 +280,9 @@ class ProteinLSTMModel(nn.Module):
         # return (sequence_output, pooled_outputs, hidden_states)
 
         # NOTE: Since we are only concerned about the value prediction task, we
-        # apply the dense layer ONLY on the pooled embeddings, not the sequence.
-        pred = self.out(pooled_outputs) # linear activation for regression task
+        # apply the dense layer ONLY on the pooled embeddings. Additionally,
+        # since this is a regression task, we apply linear (aka no) activation.
+        pred = self.out(pooled_outputs)
+        return pred
         # prediction, (hidden_states)
-        return pred, encoded[2:]
-
-
-if __name__ == "__main__":
-    import torch
-    from profit.utils.data_utils.serializers import LMDBSerializer
-    # Load data
-    dataset = LMDBSerializer.load("data/3gb1/processed/transformer_fitness/primary.mdb")
-    # Init model
-    unique_tokens = torch.unique(dataset[:]["arr_0"]).size(0)
-    model = ProteinLSTMModel(unique_tokens)
-
-    # Predict model
-    inputs = dataset[:]["arr_0"]
-    print(type(inputs))
-    print(inputs.size())
-    
-    pred = model(dataset[:]["arr_0"])
-    print(pred)
+        # return pred if not self.return_hs else pred, encoded[2:]
