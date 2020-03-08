@@ -125,8 +125,11 @@ class StratifiedSplitter(BaseSplitter):
         if task_type == 'classification':
             classes, labels = np.unique(labels, return_inverse=True)
         elif task_type == 'regression':
-            classes = np.arange(n_bins)
+            # Quantile cut the dataset into the max number of sufficient bins
+            # while dropping duplicate bin edges. In this case, the number of
+            # classes is at most n_bins (aka n_classes <= n_bins).
             labels = pd.qcut(labels, n_bins, labels=False, duplicates='drop')
+            classes = np.unique(labels)
 
         n_classes = classes.shape[0]
         n_total_val = int(frac_val * len(dataset))
