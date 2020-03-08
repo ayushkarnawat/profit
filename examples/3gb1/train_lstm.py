@@ -26,7 +26,7 @@ _labels = data[:]['arr_1'].view(-1).tolist()
 # Create subset indicies
 train_idx, val_idx = split_method_dict['stratified']().train_valid_split(
     _dataset, labels=_labels, frac_train=0.8, frac_val=0.2, return_idxs=True,
-    task_type="auto", n_bins=5)
+    task_type="auto", n_bins=10)
 train_dataset = Subset(data, train_idx)
 val_dataset = Subset(data, val_idx)
 
@@ -42,7 +42,7 @@ model = LSTMModel(vocab_size, input_size=64, hidden_size=256, num_hidden_layers=
                   hidden_dropout=0.1)
 
 # Init callbacks
-stop_clbk = EarlyStopping(patience=2, verbose=1)
+stop_clbk = EarlyStopping(patience=3, verbose=1)
 save_clbk = ModelCheckpoint("results/3gb1/lstm_fitness/", verbose=1,
                             save_weights_only=True, prefix="design0")
 # Cumbersome, but required to ensure weights get saved properly.
@@ -52,12 +52,12 @@ save_clbk.set_model(model)
 
 # Construct loss function and optimizer
 criterion = torch.nn.MSELoss(reduction='sum')
-optimizer = AdamW(model.parameters(), lr=1e-4)
+optimizer = AdamW(model.parameters(), lr=1e-3)
 
-print('Training ...')
+print(f'Train on {len(train_idx)}, validate on {len(val_idx)}...')
 # PSEUDOCODE: Until the convergeg criteria is not met: i.e. acqusition func. didn't change
 # PSEUDOCODE: Update the prefix in the model saving such that it is design{idx}
-for epoch in range(5):
+for epoch in range(50):
     # Training loop
     model.train()
     train_loss_epoch = 0

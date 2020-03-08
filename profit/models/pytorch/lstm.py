@@ -251,9 +251,9 @@ class LSTMModel(nn.Module):
         """Initialize the weights."""
 
         def _init_weights(module: nn.Module):
-            if isinstance(module, (nn.Linear, nn.Embedding)):
-                # TODO: Should this be xavier_uniform_?
+            if isinstance(module, nn.Embedding):
                 # TODO: Should we allow user to specify the mean/std?
+                # Use truncated normal distribution for embedding weights
                 init.normal_(module.weight, mean=0., std=0.02)
             if isinstance(module, nn.Linear) and module.bias is not None:
                 init.zeros_(module.bias)
@@ -286,3 +286,4 @@ class LSTMModel(nn.Module):
         return pred
         # prediction, (hidden_states)
         # return pred if not self.return_hs else pred, encoded[2:]
+        
