@@ -1,9 +1,8 @@
-"""
-Module that splits datasets into train, validation, and test sets using 
-a variety of splitting techniques. 
+"""Split datasets into train, val, and test sets using different
+splitting techniques.
 """
 
-from profit.dataset.splitters import base_splitter 
+from profit.dataset.splitters import base_splitter
 from profit.dataset.splitters import random_splitter
 from profit.dataset.splitters import stratified_splitter
 
