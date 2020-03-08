@@ -79,12 +79,12 @@ class LSTMPooler(nn.Module):
     hidden_size: int, default=1024
         Number of features in the hidden state `h`.
 
-    num_hidden_layers: int, default=3
-        Number of hidden layers.
+    num_layers: int, default=3
+        Number of layers.
 
     Inputs:
     -------
-    input: torch.Tensor, shape `(batch, hidden_size, 2*num_hidden_layers)`
+    input: torch.Tensor, shape `(batch, hidden_size, 2*num_layers)`
         Hidden pooled embedding.
 
     Outputs:
@@ -95,9 +95,9 @@ class LSTMPooler(nn.Module):
 
     def __init__(self,
                  hidden_size: int = 1024,
-                 num_hidden_layers: int = 3) -> None:
+                 num_layers: int = 3) -> None:
         super(LSTMPooler, self).__init__()
-        self.scalar_reweighting = nn.Linear(2*num_hidden_layers, 1)
+        self.scalar_reweighting = nn.Linear(2*num_layers, 1)
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.activation = nn.Tanh()
 
@@ -123,8 +123,8 @@ class LSTMEncoder(nn.Module):
     hidden_size: int, default=1024
         Number of features in the hidden state `h`.
 
-    num_hidden_layers: int, default=3
-        Number of hidden layers.
+    num_layers: int, default=3
+        Number of layers.
 
     hidden_dropout: float, default=0.1
         Percentage of input/hidden units to drop (aka set weight 0)
@@ -138,13 +138,13 @@ class LSTMEncoder(nn.Module):
     def __init__(self,
                  input_size: int = 128,
                  hidden_size: int = 1024,
-                 num_hidden_layers: int = 3,
+                 num_layers: int = 3,
                  hidden_dropout: float = 0.1,
                  return_hs: bool = False) -> None:
         super(LSTMEncoder, self).__init__()
         forward_lstm = [LSTMLayer(input_size, hidden_size)]
         reverse_lstm = [LSTMLayer(input_size, hidden_size)]
-        for _ in range(1, num_hidden_layers):
+        for _ in range(1, num_layers):
             forward_lstm.append(LSTMLayer(hidden_size, hidden_size, hidden_dropout))
             reverse_lstm.append(LSTMLayer(hidden_size, hidden_size, hidden_dropout))
         self.forward_lstm = nn.ModuleList(forward_lstm)
@@ -214,8 +214,8 @@ class LSTMModel(nn.Module):
     hidden_size: int, default=1024
         Number of features in the hidden state `h`.
 
-    num_hidden_layers: int, default=3
-        Number of hidden layers.
+    num_layers: int, default=3
+        Number of layers.
 
     num_outputs: int, default=1
         Number of outputs, i.e. values to predict. Equal to the number
@@ -234,15 +234,15 @@ class LSTMModel(nn.Module):
                  vocab_size: int,
                  input_size: int = 128,
                  hidden_size: int = 1024,
-                 num_hidden_layers: int = 3,
+                 num_layers: int = 3,
                  num_outputs: int = 1,
                  hidden_dropout: float = 0.1,
                  return_hs: bool = False) -> None:
         super(LSTMModel, self).__init__()
         self.embed_matrix = nn.Embedding(vocab_size, input_size)
-        self.encoder = LSTMEncoder(input_size, hidden_size, num_hidden_layers,
+        self.encoder = LSTMEncoder(input_size, hidden_size, num_layers,
                                    hidden_dropout, return_hs)
-        self.pooler = LSTMPooler(hidden_size, num_hidden_layers)
+        self.pooler = LSTMPooler(hidden_size, num_layers)
         self.out = nn.Linear(hidden_size, num_outputs)
         self.return_hs = return_hs
         self.init_weights()

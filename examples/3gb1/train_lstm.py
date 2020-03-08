@@ -25,8 +25,7 @@ _dataset = data[:]["arr_0"]
 _labels = data[:]['arr_1'].view(-1).tolist()
 # Create subset indicies
 train_idx, val_idx = split_method_dict['stratified']().train_valid_split(
-    _dataset, labels=_labels, frac_train=0.8, frac_val=0.2, return_idxs=True,
-    task_type="auto", n_bins=10)
+    _dataset, labels=_labels, frac_train=0.8, frac_val=0.2, return_idxs=True)
 train_dataset = Subset(data, train_idx)
 val_dataset = Subset(data, val_idx)
 
@@ -38,7 +37,7 @@ val_loader = DataLoader(val_dataset, batch_size=64, shuffle=True)
 
 # Initialize model
 vocab_size = AminoAcidTokenizer("iupac1").vocab_size
-model = LSTMModel(vocab_size, input_size=64, hidden_size=256, num_hidden_layers=3,
+model = LSTMModel(vocab_size, input_size=64, hidden_size=256, num_layers=3,
                   hidden_dropout=0.1)
 
 # Init callbacks
