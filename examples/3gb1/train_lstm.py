@@ -12,6 +12,10 @@ from profit.utils.training_utils.pytorch.callbacks import ModelCheckpoint
 
 from data import load_dataset
 
+
+# Determine which device to use
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 # Preprocess + load the dataset
 data = load_dataset('transformer', 'primary', labels='Fitness', num_data=-1,
                     filetype='mdb', as_numpy=False)
@@ -61,8 +65,8 @@ for epoch in range(50):
     model.train()
     train_loss_epoch = 0
     for batch_idx, batch in enumerate(train_loader):
-        # TODO: Map feats to gpu device
-        feats, labels = batch.values()
+        # Move feats/labels to gpu device (if available)
+        feats, labels = [arr.to(device) for arr in batch.values()]
         # Forward pass though model
         train_y_pred = model(feats)
 
@@ -81,8 +85,8 @@ for epoch in range(50):
     model.eval()
     val_loss_epoch = 0
     for j, val_batch in enumerate(val_loader):
-        # TODO: Map feats to gpu device
-        val_feats, val_labels = val_batch.values()
+        # Move feats/labels to gpu device (if available)
+        val_feats, val_labels = [arr.to(device) for arr in val_batch.values()]
         val_y_pred = model(val_feats)
         val_loss = criterion(val_y_pred, val_labels)
         val_loss_epoch += val_loss.item()

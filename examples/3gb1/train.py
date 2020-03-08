@@ -18,6 +18,9 @@ if P.backend() == "pytorch":
     from profit.utils.training_utils.pytorch.callbacks import EarlyStopping
     from profit.utils.training_utils.pytorch.callbacks import ModelCheckpoint
 
+    # Determine which device to use
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     # Stratify the dataset into train/val sets
     # TODO: Use a stratified sampler to split the target labels equally into each
     # subset. That is, both the train and validation datasets will have the same
@@ -57,7 +60,7 @@ if P.backend() == "pytorch":
     criterion = torch.nn.MSELoss(reduction='sum')
     optimizer = AdamW(model.parameters(), lr=1e-4)
 
-    print('Training...')
+    print(f'Train on {len(train_idx)}, validate on {len(val_idx)}...')
     # PSEUDOCODE: Until the convergeg criteria is not met: i.e. acqusition func. didn't change
     # PSEUDOCODE: Update the prefix in the model saving such that it is design{idx}
     for epoch in range(5):
@@ -65,8 +68,8 @@ if P.backend() == "pytorch":
         model.train()
         train_loss_epoch = 0
         for batch_idx, batch in enumerate(train_loader):
-            # TODO: Map feats to gpu device
-            atoms, adjms, dists, labels = batch.values()
+            # Move feats/labels to gpu device (if available)
+            atoms, adjms, dists, labels = [arr.to(device) for arr in batch.values()]
             # Forward pass though model
             train_y_pred = model([atoms, adjms, dists])
 
@@ -85,8 +88,9 @@ if P.backend() == "pytorch":
         model.eval()
         val_loss_epoch = 0
         for j, val_batch in enumerate(val_loader):
-            # TODO: Map feats to gpu device
-            val_atoms, val_adjms, val_dists, val_labels = val_batch.values()
+            # Move feats/labels to gpu device (if available)
+            val_atoms, val_adjms, val_dists, val_labels = [arr.to(device)\
+                for arr in val_batch.values()]
             val_y_pred = model([val_atoms, val_adjms, val_dists])
             val_loss = criterion(val_y_pred, val_labels)
             val_loss_epoch += val_loss.item()
@@ -112,8 +116,8 @@ else:
     # Shuffle, split and batch
     # https://stackoverflow.com/questions/51125266/how-do-i-split-tensorflow-datasets
     # https://docs.databricks.com/applications/deep-learning/data-prep/tfrecords-to-tensorflow.html
-    train_idx, val_idx = split_method_dict['random']().train_valid_split(data[0], \
-        labels=data[-1].flatten(), return_idxs=True)
+    train_idx, val_idx = split_method_dict['random']().train_valid_split(
+        data[0], labels=data[-1].flatten(), return_idxs=True)
     train_data = []
     val_data = []
     for arr in data:
@@ -125,8 +129,8 @@ else:
     val_X = val_data[:-1]
     val_y = val_data[-1]
 
-    # Initialize eGCN model (really hacky), it also assumes we have the data loaded 
-    # in memory, which is the wrong approach. Instead, we should peek into the 
+    # Initialize eGCN model (really hacky), it also assumes we have the data loaded
+    # in memory, which is the wrong approach. Instead, we should peek into the
     # shape defined in the TF tensors.
 
     # NOTE: Only use when TfRecordsDataset() (i.e. as_numpy=False) is used
