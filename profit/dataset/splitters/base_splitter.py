@@ -1,11 +1,13 @@
+from abc import ABC, abstractmethod
 from typing import Any, Dict, Tuple
 
 import numpy as np
 
 
-class BaseSplitter(object):
-    """Base class for doing splits."""
+class BaseSplitter(ABC):
+    """Base class for performing splits."""
 
+    @abstractmethod
     def _split(self,
                dataset: np.ndarray,
                frac_train: float = 0.75,
