@@ -17,7 +17,7 @@ from data import load_dataset
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Preprocess + load the dataset
-data = load_dataset('transformer', 'primary', labels='Fitness', num_data=-1,
+data = load_dataset('lstm', 'primary', labels='Fitness', num_data=-1,
                     filetype='mdb', as_numpy=False)
 
 # Stratify the dataset into train/val sets

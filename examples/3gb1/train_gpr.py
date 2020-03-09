@@ -15,7 +15,7 @@ from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
 
 
 # Preprocess + load the dataset
-dataset = load_dataset('transformer', 'primary', labels='Fitness', num_data=-1, \
+dataset = load_dataset('lstm', 'primary', labels='Fitness', num_data=-1, \
     filetype='tfrecords', as_numpy=True)
 # dataset = [arr[-50:] for arr in dataset]
 
