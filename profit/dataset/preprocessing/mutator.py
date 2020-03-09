@@ -110,9 +110,9 @@ class PDBMutator(object):
         __main__.pymol_argv = ["pymol", "-qc"]
         pymol.finish_launching()
 
-    
-    def modify_residues(self, pdbid: str, replace_with: Dict[int, Optional[str]]) \
-                        -> Union[List[str], rdchem.Mol]:
+
+    def mutate(self, pdbid: str,
+               replace_with: Dict[int, Optional[str]]) -> Union[List[str], rdchem.Mol]:
         """Modify amino acid residues at the defined positions.
         
         If the locations indexes exceed the amount in data, then they 

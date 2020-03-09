@@ -173,7 +173,7 @@ class DataFrameParser(BaseFileParser):
                                     "set mutator=None.".format(len(data), len(positions)))
                             # Mutate residues (to primary or tertiary) based off mutator instance
                             replace_with = {resid: data[i] for i, resid in enumerate(positions)}
-                            data = mutator.modify_residues(pdbid, replace_with=replace_with)
+                            data = mutator.mutate(pdbid, replace_with=replace_with)
 
                         # Obtain features based on which preprocessor is used
                         if isinstance(pp, tuple(preprocess_method_dict.values())):
