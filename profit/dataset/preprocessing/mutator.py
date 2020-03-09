@@ -14,25 +14,27 @@ from profit.peptide_builder.polypeptides import aa1, aa3, three_to_one, one_to_t
 from profit.utils.io_utils import maybe_create_dir, DownloadError
 
 
-def _get_conformer(mol: rdchem.Mol, conformer: str="min", algo: str="MMFF") -> rdchem.Mol:
-    """Get molecule conformer from PDB file based on parameters 
+def _get_conformer(mol: rdchem.Mol,
+                   conformer: str = "min",
+                   algo: str = "MMFF") -> rdchem.Mol:
+    """Get molecule conformer from PDB file based on parameters
     provided.
-    
+
     Params:
     -------
     mol: rdkit.Chem.rdchem.Mol
         Molecule of interest, ideally with mutiple conformers.
 
     conformer: str, optional, default="min"
-        Which conformer to select for 3D coordinates. If "min" (or 
-        "max"), then the conformer with the min (or max) energy is 
-        selected. If "first" or "last", then the first or last 
-        conformer is selected. If "avg", then the average position of 
-        all the conformers are averaged.
+        Which conformer to select for 3D coordinates. If "min" (or "max"),
+        then the conformer with the min (or max) energy is selected. If
+        "first" or "last", then the first or last conformer is selected.
+        If "avg", then the average position of all the conformers are
+        averaged.
 
     algo: str, optional, default="MMFF"
-        Which force field algorithm to optimize the coordinates with. 
-        Read rdkit description to determine which one is best suited 
+        Which force field algorithm to optimize the coordinates with.
+        Read rdkit description to determine which one is best suited
         for your application.
 
     Returns:
@@ -40,16 +42,18 @@ def _get_conformer(mol: rdchem.Mol, conformer: str="min", algo: str="MMFF") -> r
     mol: rdkit.Chem.rdchem.Mol
         Molecule with conformer of interest.
     """
-    ff = {
-        "MMFF": rdForceFieldHelpers.MMFFOptimizeMoleculeConfs, 
-        "UFF":  rdForceFieldHelpers.UFFOptimizeMoleculeConfs 
+    forcefields = {
+        "MMFF": rdForceFieldHelpers.MMFFOptimizeMoleculeConfs,
+        "UFF":  rdForceFieldHelpers.UFFOptimizeMoleculeConfs
     }
 
     if conformer == "min":
-        idx = np.argmin(ff[algo](mol, maxIters=0), axis=0)[1] # idx of lowest energy conformation
+         # Get idx of lowest energy conformation
+        idx = np.argmin(forcefields[algo](mol, maxIters=0), axis=0)[1]
         conf = mol.GetConformers()[idx]
     elif conformer == "max":
-        idx = np.argmax(ff[algo](mol, maxIters=0), axis=0)[1] # idx of highest energy conformation
+        # Get idx of highest energy conformation
+        idx = np.argmax(forcefields[algo](mol, maxIters=0), axis=0)[1]
         conf = mol.GetConformers()[idx]
     elif conformer == "first":
         conf = mol.GetConformer(0)
@@ -66,8 +70,8 @@ def _get_conformer(mol: rdchem.Mol, conformer: str="min", algo: str="MMFF") -> r
                 atom_coords[1], atom_coords[2]))
     else:
         available_confs = ["min", "max", "first", "last", "avg"]
-        raise ValueError("Cannot get `{}` conformer. Choose from the following "
-                         "{} conformer(s).".format(conformer, available_confs))
+        raise ValueError(f"Cannot get `{conformer}` conformer. Choose from the "
+                         f"following {available_confs} conformer(s).")
 
     # Save conformer, with the position specified
     mol.RemoveAllConformers()
@@ -76,32 +80,37 @@ def _get_conformer(mol: rdchem.Mol, conformer: str="min", algo: str="MMFF") -> r
 
 
 class PDBMutator(object):
-    """Insilico point mutation of peptide residue(s) with other peptide 
-    residue(s) defined by the user at the specified positions in the chain. 
+    """Insilico point mutation of peptide residue(s).
 
-    After a mutation is made at a certain position, the conformation of 
-    the mutant sidechain is optimized by some molecular dynamics (MD) 
-    simulation using a certain forcefield, i.e. Merck's molecular 
+    Mutates residues with other residue(s) defined by the user at the
+    specified positions in the chain.
+
+    After a mutation is made at a certain position, the conformation of
+    the mutant sidechain is optimized by some molecular dynamics (MD)
+    simulation using a certain forcefield, i.e. Merck's molecular
     (accuracy) or coarse-grained (speed).
 
     Params:
     -------
     fmt: str, default="tertiary"
-        Primary or tertiary structure. If "primary" structure, then the 
-        mutator simply replaces the peptide string with another peptide 
-        string. If "tertiary", then the atoms associated with the 
-        residue (at the specified XYZ location) get replaced by atoms 
-        in the other residue, usually with default rotamer configurations.
+        Primary or tertiary structure. If "primary" structure, then the
+        mutator simply replaces the peptide string with another peptide
+        string. If "tertiary", then atoms associated with the residue
+        (at the specified XYZ location) get replaced by atoms in the
+        other residue, usually with default rotamer configurations.
 
     rootdir: str, default="data/tmp"
         Base directory where all cached data is stored.
 
     cache: bool, default=False
-        If "True", the mutated files are saved after they are computed 
-        and returned. If "False" (recommended), they are deleted. 
+        If "True", the mutated files are saved after they are computed
+        and returned. If "False" (default), they are deleted.
     """
-    
-    def __init__(self, fmt: str="tertiary", rootdir="data/tmp", cache: bool=False) -> None:
+
+    def __init__(self,
+                 fmt: str = "tertiary",
+                 rootdir: str = "data/tmp",
+                 cache: bool = False) -> None:
         self.fmt = fmt
         self.cache = cache
         self.rootdir = rootdir
@@ -114,8 +123,8 @@ class PDBMutator(object):
     def mutate(self, pdbid: str,
                replace_with: Dict[int, Optional[str]]) -> Union[List[str], rdchem.Mol]:
         """Modify amino acid residues at the defined positions.
-        
-        If the locations indexes exceed the amount in data, then they 
+
+        If the locations indexes exceed the amount in data, then they
         will be ignored and a warning will be announced.
 
         Params:
@@ -124,18 +133,18 @@ class PDBMutator(object):
             PDB ID associated with the structure.
 
         replace_with: dict
-            The index location(s) within the full protein to replace 
-            certain residue(s) with. If a residue associated with a 
-            index location is None, then the modified residue is chosen 
-            randomly. If a certain index exceeds the number of available 
-            residues in the protein, then those enteries are simply 
+            The index location(s) within the full protein to replace
+            certain residue(s) with. If a residue associated with a
+            index location is None, then the modified residue is chosen
+            randomly. If a certain index exceeds the number of available
+            residues in the protein, then those enteries are simply
             ignored and the user is notified.
-        
+
         Returns:
         --------
         protein: list of str or rdkit.Chem.rdchem.Mol
-            Modified protein with residues. If fmt="primary", then list 
-            of string (peptide names) is returned. If fmt="tertiary", 
+            Modified protein with residues. If fmt="primary", then list
+            of string (peptide names) is returned. If fmt="tertiary",
             then 3D molecule structure is returned.
         """
         # Load PDB structure (download, if necessary)
@@ -157,12 +166,11 @@ class PDBMutator(object):
         # Cleanup idxs: remove indicies that exceed number of available residues
         nonvalid_idxs = [idx for idx in replace_with.keys() if idx > num_residues]
         for idx in nonvalid_idxs:
-            print("Removing idx {0:d} (out of range). There are only {1:d} " \
-                "residue(s).".format(idx, num_residues))
+            print(f"OutOfRange: Removing idx {idx} (only {num_residues} residues).")
             replace_with.pop(idx)
 
-        # Randomly choose an amino acid (AA) to replace a residue, if None is provided.
-        # Additionally, format string such that it is a valid 3 letter amino acid. 
+        # Randomly choose an amino acid (AA) to replace residue, if None is provided.
+        # Additionally, format string such that it is a valid 3 letter amino acid.
         for idx, residue in replace_with.items():
             if residue is None:
                 replace_with[idx] = np.random.choice(aa3)
@@ -173,14 +181,14 @@ class PDBMutator(object):
                 elif len(residue) == 3:
                     replace_with[idx] = residue
             else:
-                raise ValueError("Invalid residue '{}'. Choose one from the " \
-                    "following {}.".format(residue, aa1 + aa3))
+                raise ValueError(f"Invalid residue '{residue}'. Choose one from "
+                                 f"the following {aa1+aa3}.")
 
         # Determine save filepath name
-        modified_res_str = ":".join(["{0:d}{1:s}".format(k,three_to_one.get(v)) 
-                                     for k,v in replace_with.items()])
-        filename = "{0:s}_{1:s}".format(self.fmt, modified_res_str)
-        filename += ".pdb" if self.fmt == "tertiary" else ".json"  
+        modified_res_str = ":".join([f"{k}{three_to_one.get(v)}"
+                                     for k, v in replace_with.items()])
+        filename = f"{self.fmt}_{modified_res_str}"
+        filename += ".pdb" if self.fmt == "tertiary" else ".json"
         save_filepath = os.path.join(self.rootdir, pdbid, filename)
 
         # Replace primary structure, i.e. residue names (str)
@@ -203,13 +211,14 @@ class PDBMutator(object):
         elif self.fmt == "tertiary":
             if not os.path.exists(save_filepath):
                 # Split states so that we can optimize only on specific state(s).
-                # NOTE: It might be useful to choose lowest energy state to mutate, OR
-                # mutate rotamers for all positions, then choose one with lowest energy.
+                # NOTE: Might be useful to choose lowest energy state to mutate,
+                # OR mutate rotamers for all positions, then choose one with
+                # lowest energy.
                 cmd.split_states(object=pdbid)
 
                 # Delete all other objects other than one we want to mutate
-                # NOTE: For now, keep only first object. This might change depending 
-                # on which state needs to be kept.
+                # NOTE: For now, keep only first object. This might change
+                # depending on which state needs to be kept.
                 objs = cmd.get_object_list() # aka states
                 keep_objs = [pdbid + "_0001"]
                 for obj in objs:
@@ -234,10 +243,12 @@ class PDBMutator(object):
                 cmd.delete("all") # remove all objects, clears workspace
 
             # Load + choose model/structure with lowest energy
-            # NOTE: If sanitize=True, the function checks if Mol has correct hybridization/valance 
-            # structure (aka is it chemically reasonable). When converting from the PDB block, 
-            # this sometimes results in improper parsing. Instead, for now, we just check if the 
-            # Mol is syntactically valid (i.e. all rings/branches closed, no illegal atom types, etc).
+            # NOTE: If sanitize=True, the function checks if Mol has the correct
+            # hybridization/valance structure (aka is it chemically reasonable).
+            # When converting from the PDB block, this sometimes results in
+            # improper parsing. Instead, for now, we just check if the Mol is
+            # syntactically valid (i.e. all rings/branches closed, no illegal
+            # atom types, etc).
             protein = rdmolfiles.MolFromPDBFile(save_filepath, sanitize=False, removeHs=False)
             if protein.GetNumConformers() > 1:
                 protein = _get_conformer(protein, conformer="min", algo="MMFF")
