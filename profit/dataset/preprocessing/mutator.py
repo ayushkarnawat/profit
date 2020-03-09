@@ -140,9 +140,13 @@ class PDBMutator(object):
         """
         # Load PDB structure (download, if necessary)
         pdb_dir = maybe_create_dir(os.path.join(self.rootdir, pdbid))
-        is_successful = cmd.fetch(pdbid, name=pdbid, state=1, type="pdb", path=pdb_dir)
-        if is_successful == -1:
-            raise DownloadError("Unable to download '{0:s}'.".format(pdbid))
+        pdb_file = os.path.join(pdb_dir, f"{pdbid}.pdb")
+        if not os.path.exists(pdb_file):
+            is_successful = cmd.fetch(pdbid, name=pdbid, state=1, type="pdb", path=pdb_dir)
+            if is_successful == -1:
+                raise DownloadError(f"Unable to download '{pdbid}'.")
+        else:
+            cmd.load(pdb_file, object=pdbid, state=1, format="pdb")
 
         # Get all residue names, see: https://pymolwiki.org/index.php/List_Selection
         resnames_dict = {"names": []}
