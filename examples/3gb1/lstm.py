@@ -1,7 +1,8 @@
 """Train 3gb1 LSTM protein engineering model."""
 
+import pandas as pd
 import torch
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 
 from profit.dataset.splitters import split_method_dict
 from profit.models.pytorch.lstm import LSTMModel
@@ -21,23 +22,35 @@ data = load_dataset('lstm', 'primary', labels='Fitness', num_data=-1,
                     filetype='mdb', as_numpy=False)
 
 # Stratify the dataset into train/val sets
-# TODO: Use a stratified sampler to split the target labels equally into each
+# NOTE: We use a stratified sampler to split the target labels equally into each
 # subset. That is, both the train and validation datasets will have the same
 # ratio of low/mid/high fitness variants as the full dataset in each batch.
 # See: https://discuss.pytorch.org/t/29907/2
 _dataset = data[:]["arr_0"]
-_labels = data[:]['arr_1'].view(-1).tolist()
+_labels = data[:]['arr_1'].view(-1)
 # Create subset indicies
 train_idx, val_idx = split_method_dict['stratified']().train_valid_split(
-    _dataset, labels=_labels, frac_train=0.8, frac_val=0.2, return_idxs=True)
-train_dataset = Subset(data, train_idx)
-val_dataset = Subset(data, val_idx)
+    _dataset, labels=_labels.tolist(), frac_train=0.8, frac_val=0.2,
+    return_idxs=True, n_bins=10)
+train_dataset = Subset(data, sorted(train_idx))
+val_dataset = Subset(data, sorted(val_idx))
 
-# For now, we hope that shuffling the dataset will be enough to make it random
-# that some non-zero target labels are still introduced in each batch. Obviously
-# this is not ideal, but, for the sake of quickness, works for now.
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=64, shuffle=True)
+# Compute sample weight (each sample should get its own weight)
+def stratified_sampler(labels: torch.Tensor, nbins: int = 10) -> WeightedRandomSampler:
+    bin_labels = torch.tensor(pd.qcut(labels.tolist(), q=nbins,
+                                      labels=False, duplicates='drop'))
+    class_sample_count = torch.tensor(
+        [(bin_labels == t).sum() for t in torch.unique(bin_labels, sorted=True)])
+    weight = 1. / class_sample_count.float()
+    samples_weight = torch.zeros_like(labels)
+    for t in torch.unique(bin_labels):
+        samples_weight[bin_labels == t] = weight[t]
+    return WeightedRandomSampler(samples_weight, len(samples_weight))
+
+# Create sampler and loader
+train_sampler = stratified_sampler(train_dataset[:]['arr_1'].view(-1))
+train_loader = DataLoader(train_dataset, batch_size=128, sampler=train_sampler)
+val_loader = DataLoader(val_dataset, batch_size=128)
 
 # Initialize model
 vocab_size = AminoAcidTokenizer("iupac1").vocab_size
