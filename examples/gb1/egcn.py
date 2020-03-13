@@ -1,4 +1,4 @@
-"""Train 3gb1 protein engineering model."""
+"""Train GB1 protein engineering model."""
 
 from profit import backend as P
 from profit.dataset.splitters import split_method_dict

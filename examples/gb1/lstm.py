@@ -1,4 +1,9 @@
-"""Train 3gb1 LSTM protein engineering model."""
+"""Train GB1 LSTM protein engineering model.
+
+References:
+[1] https://git.io/Jv6kw
+[2] https://git.io/Jv6ko
+"""
 
 import pandas as pd
 import torch
