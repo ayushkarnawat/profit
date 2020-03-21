@@ -72,6 +72,7 @@ class BaseVAE(nn.Module):
 
 
 class SequenceVAE(BaseVAE):
+    """VAE for (one-hot) encoded sequences."""
 
     def __init__(self, input_size, h_dim1=128, h_dim2=64, latent_size=20):
         super(SequenceVAE, self).__init__()
@@ -79,7 +80,6 @@ class SequenceVAE(BaseVAE):
         self.latent_size = latent_size
 
         # Probablistic encoder
-        # latent_size=20 since each AA encoding should have an encoding
         self.fc1 = nn.Linear(input_size, h_dim1)
         self.fc2 = nn.Linear(h_dim1, h_dim2)
         self.fc31 = nn.Linear(h_dim2, latent_size)
@@ -91,7 +91,7 @@ class SequenceVAE(BaseVAE):
 
 
     def encode(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        # Input tensor: x = (num_samples, seq_len)
+        # Input tensor: x = (num_samples, seq_len, vocab_size)
         h1 = F.relu(self.fc1(x))
         h2 = F.relu(self.fc2(h1))
         return self.fc31(h2), self.fc32(h2)
@@ -101,4 +101,5 @@ class SequenceVAE(BaseVAE):
         # Input tensor: Latent vector z = (num_samples, latent_size)
         h = F.relu(self.fc4(z))
         h = F.relu(self.fc5(h))
-        return torch.sigmoid(self.fc6(h))
+        # Softmax since it is a multiclass classification problem of tokens
+        return F.log_softmax(self.fc6(h))
