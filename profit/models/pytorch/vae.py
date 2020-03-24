@@ -46,8 +46,8 @@ class BaseVAE(nn.Module):
 
         References:
         -----------
-        [1] https://gregorygundersen.com/blog/2018/04/29/reparameterization/
-        [2] https://stats.stackexchange.com/a/226136
+        -[1] https://gregorygundersen.com/blog/2018/04/29/reparameterization/
+        -[2] https://stats.stackexchange.com/a/226136
         """
         std = torch.exp(0.5*logvar)
         # eps=N(0,I), where the I is an identity matrix of same size as std
@@ -68,26 +68,27 @@ class BaseVAE(nn.Module):
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
-        return self.decode(z), mu, logvar
+        return self.decode(z), mu, logvar, z
 
 
 class SequenceVAE(BaseVAE):
     """VAE for (one-hot) encoded sequences."""
 
-    def __init__(self, input_size, h_dim1=128, h_dim2=64, latent_size=20):
+    def __init__(self,
+                 input_size,
+                 hidden_size_1=128,
+                 hidden_size_2=64,
+                 latent_size=20):
         super(SequenceVAE, self).__init__()
-        self.input_size = input_size
-        self.latent_size = latent_size
-
         # Probablistic encoder
-        self.fc1 = nn.Linear(input_size, h_dim1)
-        self.fc2 = nn.Linear(h_dim1, h_dim2)
-        self.fc31 = nn.Linear(h_dim2, latent_size)
-        self.fc32 = nn.Linear(h_dim2, latent_size)
+        self.fc1 = nn.Linear(input_size, hidden_size_1)
+        self.fc2 = nn.Linear(hidden_size_1, hidden_size_2)
+        self.fc31 = nn.Linear(hidden_size_2, latent_size)
+        self.fc32 = nn.Linear(hidden_size_2, latent_size)
         # Probablistic decoder
-        self.fc4 = nn.Linear(latent_size, h_dim2)
-        self.fc5 = nn.Linear(h_dim2, h_dim1)
-        self.fc6 = nn.Linear(h_dim1, input_size)
+        self.fc4 = nn.Linear(latent_size, hidden_size_2)
+        self.fc5 = nn.Linear(hidden_size_2, hidden_size_1)
+        self.fc6 = nn.Linear(hidden_size_1, input_size)
 
 
     def encode(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
