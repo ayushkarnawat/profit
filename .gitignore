@@ -110,5 +110,7 @@ venv.bak/
 .DS_Store
 
 # project specific
+bin/**
 data/**
-results/**
+dumps/**
+logs/**

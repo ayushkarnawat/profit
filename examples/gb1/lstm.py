@@ -12,9 +12,9 @@ from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 from profit.dataset.splitters import split_method_dict
 from profit.models.pytorch.lstm import LSTMModel
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
-from profit.utils.training_utils.pytorch.optimizers import AdamW
 from profit.utils.training_utils.pytorch.callbacks import EarlyStopping
 from profit.utils.training_utils.pytorch.callbacks import ModelCheckpoint
+from profit.utils.training_utils.pytorch.optimizers import AdamW
 
 from data import load_dataset
 
@@ -64,7 +64,7 @@ model = LSTMModel(vocab_size, input_size=64, hidden_size=256, num_layers=3,
 
 # Init callbacks
 stop_clbk = EarlyStopping(patience=3, verbose=1)
-save_clbk = ModelCheckpoint("results/3gb1/lstm_fitness/", verbose=1,
+save_clbk = ModelCheckpoint("bin/3gb1/lstm_fitness/", verbose=1,
                             save_weights_only=True, prefix="design0")
 # Cumbersome, but required to ensure weights get saved properly.
 # How do we ensure that the model (and its updated weights) are being used
@@ -80,10 +80,7 @@ criterion = torch.nn.MSELoss(reduction="mean")
 optimizer = AdamW(model.parameters(), lr=1e-3)
 
 print(f"Train on {len(train_idx)}, validate on {len(val_idx)}...")
-# PSEUDOCODE: Until the convergence criteria is not met, i.e. the acqusition
-#             function didn't change (usually modelled by KL(p || q))
-# PSEUDOCODE: Update model checkpoint prefix such that it is design{idx}
-for epoch in range(15):
+for epoch in range(1, 16):
     # Training loop
     model.train()
     train_loss = 0
@@ -100,12 +97,12 @@ for epoch in range(15):
         batch_loss = loss.item() * len(labels)
         train_loss += batch_loss
         # Print loss (for every kth batch)
-        if (batch_idx+1) % 5 == 0:
+        if batch_idx % 2 == 0:
             print("Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
-                epoch, (batch_idx+1) * len(labels), len(train_loader.dataset),
-                100. * (batch_idx+1) / len(train_loader), loss.item()))
+                epoch, batch_idx * len(labels), len(train_loader.dataset),
+                100. * batch_idx / len(train_loader), loss.item()))
     # MSE over all training examples
-    print("====> Epoch: {} Train (avg) loss: {:.4f}".format(
+    print('====> Epoch: {} Average loss: {:.4f}'.format(
         epoch, train_loss / len(train_loader.dataset)))
 
     # Validation loop
@@ -119,7 +116,7 @@ for epoch in range(15):
             loss = criterion(val_y_pred, val_labels)
             val_loss += loss.item() * len(val_labels)
     val_loss /= len(val_loader.dataset)
-    print(f"====> Epoch: {epoch} Test (avg) loss: {val_loss:.4f}")
+    print(f'====> Test set loss: {val_loss:.4f}')
 
     # Stop training (based off val loss) and save (top k) ckpts
     save_clbk.on_epoch_end(epoch, logs={"val_loss": val_loss})
