@@ -211,10 +211,16 @@ def main(args):
                               kl_loss.item() / batch_size, kl_weight))
 
                 if split == "valid":
+                    # Obtain reconstructed sequences
+                    recon_seqs = torch.argmax(torch.exp(logp), dim=-1)
+
+                    if "recon_seqs" not in tracker:
+                        tracker["recon_seqs"] = list()
                     if "target_seqs" not in tracker:
                         tracker["target_seqs"] = list()
-                    for seq in data.numpy():
-                        tracker["target_seqs"] += ["".join(tokenizer.decode(seq))]
+                    for rseq, tseq in zip(recon_seqs.numpy(), data.numpy()):
+                        tracker["recon_seqs"] += ["".join(tokenizer.decode(rseq))]
+                        tracker["target_seqs"] += ["".join(tokenizer.decode(tseq))]
                     tracker["z"] = torch.cat((tracker["z"], z.data), dim=0)
 
             # Bookkeeping (epoch)
@@ -226,7 +232,11 @@ def main(args):
 
             # Save dump of all valid seqs and the encoded latent space
             if split == "valid":
-                dump = {"target_seqs": tracker["target_seqs"], "z": tracker["z"].tolist()}
+                dump = {
+                    "recon_seqs": tracker["recon_seqs"],
+                    "target_seqs": tracker["target_seqs"],
+                    "z": tracker["z"].tolist()
+                }
                 if not os.path.exists(os.path.join("dumps", ts)):
                     os.makedirs(os.path.join("dumps", ts))
                 with open(os.path.join("dumps", ts, f"valid_E{epoch}.json"), "w") as dump_file:
