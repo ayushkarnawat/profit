@@ -311,12 +311,12 @@ class ModelCheckpoint(Callback):
             return
         if self.epochs_since_last_check >= self.period:
             self.epochs_since_last_check = 0 # reset
-            filepath = os.path.join(f"{self.savedir}", f"{self.prefix}_epoch{epoch}.ckpt")
+            filepath = os.path.join(f"{self.savedir}", f"{self.prefix}_epoch{epoch}.pt")
             version_cnt = 0
             while os.path.isfile(filepath):
                 # if this epoch was called before, make versions
                 filepath = os.path.join(f"{self.savedir}", 
-                                        f"{self.prefix}_epoch{epoch}_v{version_cnt}.ckpt")
+                                        f"{self.prefix}_epoch{epoch}_v{version_cnt}.pt")
                 version_cnt += 1
 
             if self.save_top_k != -1:
