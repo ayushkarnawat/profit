@@ -102,5 +102,5 @@ class SequenceVAE(BaseVAE):
         # Input tensor: Latent vector z = (num_samples, latent_size)
         h = F.relu(self.fc4(z))
         h = F.relu(self.fc5(h))
-        # Softmax since it is a multiclass classification problem of tokens
-        return F.log_softmax(self.fc6(h))
+        # Return logits since F.cross_entropy computes log_softmax internally
+        return self.fc6(h)

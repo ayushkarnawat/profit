@@ -120,11 +120,18 @@ def main(args):
             return min(1, step/x0)
 
     # Construct loss function
-    def loss_fn(logp, target, mu, logvar, anneal_function, step, k, x0):
+    def loss_fn(pred, target, mu, logvar, anneal_function, step, k, x0):
+        """Compute variance of evidence lower bound (ELBO) loss.
+
+        NOTE: The pred values should be logits (raw values). That is, no
+        softmax/log softmax should be applied to the outputs. This is
+        because F.cross_entropy() applies a F.log_softmax() internally
+        before computing the negative log likelihood using F.nll_loss().
+        """
         # Reconstruction loss
-        # logp=(N,s,b), target=(N,s), where N=batch_size, s=seqlen, b=vocab_size
-        logp = logp.permute(0, 2, 1) # Must be (N,b,s) for F.nll_loss
-        nll_loss = F.nll_loss(logp, target, reduction="sum")
+        # pred=(N,s,b), target=(N,s), where N=batch_size, s=seqlen, b=vocab_size
+        pred = pred.permute(0, 2, 1) # Must be (N,b,s) for F.cross_entropy
+        nll_loss = F.cross_entropy(pred, target, reduction="sum")
 
         # KL Divergence: 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
         kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
@@ -176,9 +183,9 @@ def main(args):
                 onehot.scatter_(2, torch.unsqueeze(data, 2), 1)
 
                 # Forward pass
-                logp, mu, logvar, z = model(onehot)
+                pred, mu, logvar, z = model(onehot)
                 # Loss calculation
-                nll_loss, kl_loss, kl_weight = loss_fn(logp, data, mu, logvar, \
+                nll_loss, kl_loss, kl_weight = loss_fn(pred, data, mu, logvar, \
                     args.anneal_function, step, args.k, args.x0)
                 loss = (nll_loss + kl_weight * kl_loss) / batch_size
                 # Compute gradients and update params/weights
@@ -211,8 +218,8 @@ def main(args):
                               kl_loss.item() / batch_size, kl_weight))
 
                 if split == "valid":
-                    # Obtain reconstructed sequences
-                    recon_seqs = torch.argmax(torch.exp(logp), dim=-1)
+                    # Apply softmax to convert logits -> prob to reconstruct seqs
+                    recon_seqs = torch.argmax(F.softmax(pred), dim=-1)
 
                     if "recon_seqs" not in tracker:
                         tracker["recon_seqs"] = list()
