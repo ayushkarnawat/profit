@@ -246,12 +246,12 @@ def main(args):
                 }
                 if not os.path.exists(os.path.join("dumps", ts)):
                     os.makedirs(os.path.join("dumps", ts))
-                with open(os.path.join("dumps", ts, f"valid_E{epoch}.json"), "w") as dump_file:
+                with open(os.path.join("dumps", ts, f"valid_E{epoch:04d}.json"), "w") as dump_file:
                     json.dump(dump, dump_file)
 
             # Save checkpoint
             if split == "train":
-                checkpoint_path = os.path.join(save_model_path, f"E{epoch}.pt")
+                checkpoint_path = os.path.join(save_model_path, f"E{epoch:04d}.pt")
                 torch.save(model.state_dict(), checkpoint_path)
                 print(f"Model saved at {checkpoint_path}")
 
