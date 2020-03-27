@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Union
 
 import numpy as np
 
-from profit.utils.data_utils.vocabs import IUPAC_AA1_VOCAB, IUPAC_AA3_VOCAB
+from profit.utils.data_utils import vocabs
 
 
 class BaseTokenizer(ABC):
@@ -32,11 +32,13 @@ class AminoAcidTokenizer(BaseTokenizer):
 
     def __init__(self, vocab: str):
         if vocab == "iupac1":
-            self.vocab: Dict[str, Any] = IUPAC_AA1_VOCAB
+            self.vocab: Dict[str, Any] = vocabs.IUPAC_AA1_VOCAB
         elif vocab == "iupac3":
-            self.vocab: Dict[str, Any] = IUPAC_AA3_VOCAB
+            self.vocab: Dict[str, Any] = vocabs.IUPAC_AA3_VOCAB
+        elif vocab == "aa20":
+            self.vocab: Dict[str, Any] = vocabs.AA20_VOCAB
         else:
-            raise ValueError(f"{vocab} vocab type is unavailable.")
+            raise ValueError(f"vocab={vocab} is unavailable.")
         self.flipped_vocab = {v:k for k,v in self.vocab.items()}
         self._vocab_type = vocab
         assert self.pad_token in self.vocab and self.unknown_token in self.vocab
@@ -67,15 +69,15 @@ class AminoAcidTokenizer(BaseTokenizer):
     @property
     def pad_token(self) -> str:
         return "<pad>"
-    
+
     @property
     def unknown_token(self) -> str:
         return "<unk>"
 
-
-    def tokenize(self, text: str) -> List[str]:
+    @staticmethod
+    def tokenize(text: str) -> List[str]:
         """Tokenize (seperate) input."""
-        return [x for x in text]
+        return list(text)
 
 
     def convert_token_to_id(self, token: str) -> int:
@@ -117,7 +119,7 @@ class AminoAcidTokenizer(BaseTokenizer):
 
     def encode(self, text: Union[str, List[str]]) -> np.ndarray:
         """Encode text into ints (based off vocab)."""
-        tokens = self.tokenize(text) if isinstance(text, str) else text
+        tokens = AminoAcidTokenizer.tokenize(text) if isinstance(text, str) else text
         token_ids = self.convert_tokens_to_ids(tokens)
         return np.array(token_ids, dtype=np.float)
 

@@ -75,7 +75,7 @@ def main(args):
 
     # Preprocess + load the dataset
     dataset = load_dataset("lstm", "primary", labels="Fitness", num_data=-1,
-                           filetype="mdb", as_numpy=False)
+                           filetype="mdb", as_numpy=False, vocab=args.vocab)
 
     # Stratify train/val/test sets such that the target labels are equally
     # represented in each subset. Each subset will have the same ratio of
@@ -270,7 +270,7 @@ if __name__ == "__main__":
     # Instead of defining the embedding_size (usually same as num_vocab in your
     # dictionary), we instead ask what (pre-defined) vocabulary to use.
     # parser.add_argument("-eb", "--embedding_size", type=int, default=300)
-    parser.add_argument("-vb", "--vocab", type=str, default="iupac1")
+    parser.add_argument("-vb", "--vocab", type=str, default="aa20")
     parser.add_argument("-hs1", "--hidden_size_1", type=int, default=64)
     parser.add_argument("-hs2", "--hidden_size_2", type=int, default=32)
     parser.add_argument("-ls", "--latent_size", type=int, default=10)
@@ -287,7 +287,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     args.anneal_function = args.anneal_function.lower()
 
-    assert args.vocab in ["iupac1", "iupac3"]
+    assert args.vocab in ["iupac1", "iupac3", "aa20"]
     assert args.anneal_function in ["logistic", "linear"]
 
     main(args)

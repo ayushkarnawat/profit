@@ -72,4 +72,30 @@ IUPAC_AA3_VOCAB = OrderedDict([
     ("<sep>", 3),   # seperation token (end of sentence)
     ("<unk>", 4),   # unknown token
 ])
-IUPAC_AA3_VOCAB.update({k:IUPAC_AA1_VOCAB.get(v) for k,v in IUPAC_AA_CODES.items()})
+IUPAC_AA3_VOCAB.update({k:IUPAC_AA1_VOCAB.get(v) for k, v in IUPAC_AA_CODES.items()})
+
+
+AA20_VOCAB = OrderedDict([
+    ("<pad>", 0),   # padding token
+    ("<unk>", 1),   # unknown token
+    ("A", 2),
+    ("C", 3),
+    ("D", 4),
+    ("E", 5),
+    ("F", 6),
+    ("G", 7),
+    ("H", 8),
+    ("I", 9),
+    ("K", 10),
+    ("L", 11),
+    ("M", 12),
+    ("N", 13),
+    ("P", 14),
+    ("Q", 15),
+    ("R", 16),
+    ("S", 17),
+    ("T", 18),
+    ("V", 19),
+    ("W", 20),
+    ("Y", 21),
+])
