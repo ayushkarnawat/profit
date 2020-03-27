@@ -72,35 +72,38 @@ class BaseVAE(nn.Module):
 
 
 class SequenceVAE(BaseVAE):
-    """VAE for (one-hot) encoded sequences."""
+    """CbAS VAE model for (one-hot) encoded sequences."""
 
     def __init__(self,
-                 input_size,
-                 hidden_size_1=128,
-                 hidden_size_2=64,
-                 latent_size=20):
+                 seqlen: int,
+                 vocab_size: int,
+                 hdim: int = 64,
+                 latent_size: int = 20) -> None:
         super(SequenceVAE, self).__init__()
-        # Probablistic encoder
-        self.fc1 = nn.Linear(input_size, hidden_size_1)
-        self.fc2 = nn.Linear(hidden_size_1, hidden_size_2)
-        self.fc31 = nn.Linear(hidden_size_2, latent_size)
-        self.fc32 = nn.Linear(hidden_size_2, latent_size)
-        # Probablistic decoder
-        self.fc4 = nn.Linear(latent_size, hidden_size_2)
-        self.fc5 = nn.Linear(hidden_size_2, hidden_size_1)
-        self.fc6 = nn.Linear(hidden_size_1, input_size)
+        self.seqlen = seqlen
+        self.vocab_size = vocab_size
 
+        # Probablistic encoder
+        self.fc1 = nn.Linear(seqlen * vocab_size, hdim)
+        self.fc21 = nn.Linear(hdim, latent_size)
+        self.fc22 = nn.Linear(hdim, latent_size)
+        # Probablistic decoder
+        self.fc3 = nn.Linear(latent_size, hdim)
+        self.fc4 = nn.Linear(hdim, seqlen * vocab_size)
+        # Reshape occurs here (see self.decode())
+        # size is now: (seqlen * vocab_size) -> (seqlen, vocab_size)
+        self.fc5 = nn.Linear(vocab_size, vocab_size)
 
     def encode(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        # Input tensor: x = (num_samples, seq_len, vocab_size)
+        # Flatten (n, seqlen, vocab_size) -> (n, seqlen * vocab_size)
+        x = x.view(x.size(0), -1)
         h1 = F.relu(self.fc1(x))
-        h2 = F.relu(self.fc2(h1))
-        return self.fc31(h2), self.fc32(h2)
-
+        return self.fc21(h1), self.fc22(h1)
 
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         # Input tensor: Latent vector z = (num_samples, latent_size)
-        h = F.relu(self.fc4(z))
-        h = F.relu(self.fc5(h))
+        h3 = F.relu(self.fc3(z))
+        h4 = self.fc4(h3)
+        reshaped = h4.view(h4.size(0), self.seqlen, self.vocab_size)
         # Return logits since F.cross_entropy computes log_softmax internally
-        return self.fc6(h)
+        return self.fc5(reshaped)
