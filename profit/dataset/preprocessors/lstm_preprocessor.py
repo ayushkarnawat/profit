@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Union
 
 import numpy as np
 from profit.dataset.preprocessing.seq_feats import check_num_residues
@@ -11,6 +11,10 @@ class LSTMPreprocessor(SequencePreprocessor):
 
     Params:
     -------
+    vocab: str
+        Vocab dictionary used to convert sequence (i.e. amino acid
+        residues) to ints via :class:`AminoAcidTokenizer`.
+
     max_residues: int, default=-1
         Maximum allowed number of residues in a molecule. If negative,
         there is no limit.
@@ -25,18 +29,13 @@ class LSTMPreprocessor(SequencePreprocessor):
         If 'True', then pre-trained amino acid embeddings are used. If
         'False', the amino acid residues are only converted to ints
         based on a vocab dictionary (defined by vocab).
-
-    vocab: str, optional, default=None
-        Vocab dictionary used to convert sequence (i.e. amino acid
-        residues) to ints via :class:`AminoAcidTokenizer`. If None,
-        vocab type is taken to be the mode of the len of the token(s).
     """
 
     def __init__(self,
+                 vocab: str,
                  max_residues: int = -1,
                  out_size: int = -1,
-                 use_pretrained: bool = False,
-                 vocab: Optional[str] = None) -> None:
+                 use_pretrained: bool = False) -> None:
         super(LSTMPreprocessor, self).__init__()
 
         if max_residues >= 0 and out_size >= 0 and max_residues > out_size:
@@ -63,4 +62,4 @@ class LSTMPreprocessor(SequencePreprocessor):
             Amino acid embedding of the protein.
         """
         check_num_residues(seq, self.max_residues)
-        return construct_embedding(seq, self.out_size, self.use_pretrained, self.vocab)
+        return construct_embedding(seq, self.vocab, self.out_size, self.use_pretrained)
