@@ -109,7 +109,8 @@ def main(args):
     # Initialize model
     tokenizer = AminoAcidTokenizer(args.vocab)
     vocab_size = tokenizer.vocab_size
-    model = SequenceVAE(vocab_size, args.hidden_size_1, args.hidden_size_2,
+    seqlen = _dataset.size(1)
+    model = SequenceVAE(seqlen, vocab_size, args.hidden_size,
                         args.latent_size).to(device)
 
     # Anneal KL-divergence term, see: https://arxiv.org/abs/1511.06349
@@ -218,8 +219,15 @@ def main(args):
                               kl_loss.item() / batch_size, kl_weight))
 
                 if split == "valid":
-                    # Apply softmax to convert logits -> prob to reconstruct seqs
-                    recon_seqs = torch.argmax(F.softmax(pred), dim=-1)
+                    # # Apply softmax to convert logits -> prob to reconstruct seqs
+                    # recon_seqs = torch.argmax(F.softmax(pred), dim=-1)
+
+                    # HACK(THIS IS WRONG): When using the AA20 vocab, to avoid
+                    # having <pad>/<unk> in our reconstruction vocab, we eliminate
+                    # their softmax prediction by removing them (pred[..., 2:]).
+                    # Alternatively, we could check what unique target values are
+                    # and keep only the probabilty from those predictions.
+                    recon_seqs = torch.argmax(F.softmax(pred)[..., 2:], dim=-1) + 2
 
                     if "recon_seqs" not in tracker:
                         tracker["recon_seqs"] = list()
@@ -271,8 +279,7 @@ if __name__ == "__main__":
     # dictionary), we instead ask what (pre-defined) vocabulary to use.
     # parser.add_argument("-eb", "--embedding_size", type=int, default=300)
     parser.add_argument("-vb", "--vocab", type=str, default="aa20")
-    parser.add_argument("-hs1", "--hidden_size_1", type=int, default=64)
-    parser.add_argument("-hs2", "--hidden_size_2", type=int, default=32)
+    parser.add_argument("-hs", "--hidden_size", type=int, default=64)
     parser.add_argument("-ls", "--latent_size", type=int, default=10)
 
     parser.add_argument("-af", "--anneal_function", type=str, default="logistic")
