@@ -69,9 +69,11 @@ from data import load_dataset
 def main(args):
 
     ts = time.strftime("%Y-%b-%d-%H:%M:%S", time.gmtime())
-    splits = ["train", "valid"] + (["test"] if args.test else [])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
+    splits = ["train"] if args.train_size > 0 else []
+    splits += ["valid"] if args.valid_size > 0 else []
+    splits += ["test"] if args.test_size > 0 else []
 
     # Preprocess + load the dataset
     dataset = load_dataset("lstm", "primary", labels="Fitness", num_data=-1,
@@ -85,8 +87,9 @@ def main(args):
     _labels = dataset[:]["arr_1"].view(-1)
     # Create subset indicies
     subset_idx = split_method_dict["stratified"]().train_valid_test_split(
-        _dataset, labels=_labels.tolist(), frac_train=0.8, frac_val=0.2,
-        frac_test=0., return_idxs=True, n_bins=10)
+        dataset=_dataset, labels=_labels.tolist(), frac_train=args.train_size,
+        frac_val=args.valid_size, frac_test=args.test_size, return_idxs=True,
+        n_bins=5)
     stratified = {split: Subset(dataset, sorted(idx))
                   for split, idx in zip(splits, subset_idx)}
 
@@ -103,7 +106,7 @@ def main(args):
             samples_weight[bin_labels == t] = weight[t]
         return WeightedRandomSampler(samples_weight, len(samples_weight))
 
-    # Create sampler
+    # Create sampler (only needed for train)
     sampler = stratified_sampler(stratified["train"][:]["arr_1"].view(-1))
 
     # Initialize model
@@ -147,8 +150,9 @@ def main(args):
         # NOTE: On MacOS, len(exp_name) < 255 to ensure os.makedirs() makes the
         # dir. This is due to the hard limit set by the filesystem. Therefore,
         # we remove non-essential vars from the name.
-        remove_vars = ["logdir", "print_every", "save_model_path",
-                       "tensorboard_logging", "test"]
+        remove_vars = ["train_size", "valid_size", "test_size", "print_every",
+                       "tensorboard_logging", "logdir", "save_model_path",
+                       "dumpdir"]
         params = "__".join([f"{key}={value}" for key, value in vars(args).items()
                             if key not in remove_vars])
         exp_name = params + f"__time={ts}"
@@ -252,9 +256,10 @@ def main(args):
                     "target_seqs": tracker["target_seqs"],
                     "z": tracker["z"].tolist()
                 }
-                if not os.path.exists(os.path.join("dumps", ts)):
-                    os.makedirs(os.path.join("dumps", ts))
-                with open(os.path.join("dumps", ts, f"valid_E{epoch:04d}.json"), "w") as dump_file:
+                if not os.path.exists(os.path.join(args.dumpdir, ts)):
+                    os.makedirs(os.path.join(args.dumpdir, ts))
+                with open(os.path.join(args.dumpdir, ts, f"valid_E{epoch:04d}.json"),
+                          "w") as dump_file:
                     json.dump(dump, dump_file)
 
             # Save checkpoint
@@ -269,14 +274,16 @@ if __name__ == "__main__":
 
     # parser.add_argument("--data_dir", type=str, default="data")
     # parser.add_argument("--max_sequence_length", type=int, default=60)
-    parser.add_argument("--test", action="store_true")
+    parser.add_argument("--train_size", type=float, default=1.0, nargs='?', const=1)
+    parser.add_argument("--valid_size", type=float, default=0., nargs='?', const=1)
+    parser.add_argument("--test_size", type=float, default=0., nargs='?', const=1)
 
     parser.add_argument("-ep", "--epochs", type=int, default=50)
     parser.add_argument("-bs", "--batch_size", type=int, default=16)
     parser.add_argument("-lr", "--learning_rate", type=float, default=1e-3)
 
-    # Instead of defining the embedding_size (usually same as num_vocab in your
-    # dictionary), we instead ask what (pre-defined) vocabulary to use.
+    # NOTE: Instead of defining the embedding_size (usually same as num_vocab
+    # in the dictionary), we instead ask what (pre-defined) vocabulary to use.
     # parser.add_argument("-eb", "--embedding_size", type=int, default=300)
     parser.add_argument("-vb", "--vocab", type=str, default="aa20")
     parser.add_argument("-hs", "--hidden_size", type=int, default=64)
@@ -288,10 +295,12 @@ if __name__ == "__main__":
 
     parser.add_argument("-v", "--print_every", type=int, default=5)
     parser.add_argument("-tb", "--tensorboard_logging", action="store_true")
-    parser.add_argument("-log", "--logdir", type=str, default="logs")
-    parser.add_argument("-bin", "--save_model_path", type=str, default="bin")
+    parser.add_argument("-log", "--logdir", type=str, default="logs/vae")
+    parser.add_argument("-bin", "--save_model_path", type=str, default="bin/vae")
+    parser.add_argument("-dump", "--dumpdir", type=str, default="dumps/vae")
 
     args = parser.parse_args()
+    args.vocab = args.vocab.lower()
     args.anneal_function = args.anneal_function.lower()
 
     assert args.vocab in ["iupac1", "iupac3", "aa20"]
