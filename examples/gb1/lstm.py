@@ -1,12 +1,12 @@
-"""Train GB1 LSTM protein engineering model.
+"""Train GB1 LSTM oracle."""
 
-References:
-[1] https://git.io/Jv6kw
-[2] https://git.io/Jv6ko
-"""
+import math
+import multiprocessing as mp
 
 import pandas as pd
+
 import torch
+from torch.nn import functional as F
 from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 
 from profit.dataset.splitters import split_method_dict
@@ -19,29 +19,32 @@ from profit.utils.training_utils.pytorch.optimizers import AdamW
 from data import load_dataset
 
 
-# Determine which device to use
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
+splits = ["train", "valid"]
+# splits = ["train"] if args.train_size > 0 else []
+# splits += ["valid"] if args.valid_size > 0 else []
+# splits += ["test"] if args.test_size > 0 else []
 
 # Preprocess + load the dataset
-data = load_dataset("lstm", "primary", labels="Fitness", num_data=-1,
-                    filetype="mdb", as_numpy=False)
+dataset = load_dataset("lstm", "primary", labels="Fitness", num_data=-1,
+                       filetype="mdb", as_numpy=False, vocab="aa20")
 
-# Stratify the dataset into train/val sets
-# NOTE: We use a stratified sampler to split the target labels equally into each
-# subset. That is, both the train and validation datasets will have the same
-# ratio of low/mid/high fitness variants as the full dataset in each batch.
-# See: https://discuss.pytorch.org/t/29907/2
-_dataset = data[:]["arr_0"]
-_labels = data[:]["arr_1"].view(-1)
+# Stratify train/val/test sets s.t. the target labels are equally represented
+# in each subset. Each subset will have the same ratio of low/mid/high variants
+# in each batch as the full dataset. See: https://discuss.pytorch.org/t/29907/2
+_dataset = dataset[:]["arr_0"]
+_labels = dataset[:]["arr_1"].view(-1)
 # Create subset indicies
-train_idx, val_idx = split_method_dict["stratified"]().train_valid_split(
-    _dataset, labels=_labels.tolist(), frac_train=0.8, frac_val=0.2,
-    return_idxs=True, n_bins=10)
-train_dataset = Subset(data, sorted(train_idx))
-val_dataset = Subset(data, sorted(val_idx))
+subset_idx = split_method_dict["stratified"]().train_valid_test_split(
+    dataset=_dataset, labels=_labels.tolist(), frac_train=0.9,
+    frac_val=0.1, frac_test=0., return_idxs=True, n_bins=5)
+stratified = {split: Subset(dataset, sorted(idx))
+              for split, idx in zip(splits, subset_idx)}
 
 # Compute sample weight (each sample should get its own weight)
-def stratified_sampler(labels: torch.Tensor, nbins: int = 10) -> WeightedRandomSampler:
+def stratified_sampler(labels: torch.Tensor,
+                       nbins: int = 10) -> WeightedRandomSampler:
     bin_labels = torch.tensor(pd.qcut(labels.tolist(), q=nbins,
                                       labels=False, duplicates="drop"))
     class_sample_count = torch.tensor(
@@ -52,74 +55,121 @@ def stratified_sampler(labels: torch.Tensor, nbins: int = 10) -> WeightedRandomS
         samples_weight[bin_labels == t] = weight[t]
     return WeightedRandomSampler(samples_weight, len(samples_weight))
 
-# Create sampler and loader
-train_sampler = stratified_sampler(train_dataset[:]["arr_1"].view(-1))
-train_loader = DataLoader(train_dataset, batch_size=64, sampler=train_sampler)
-val_loader = DataLoader(val_dataset, batch_size=128)
+# Create sampler (only needed for train)
+sampler = stratified_sampler(stratified["train"][:]["arr_1"].view(-1))
 
-# Initialize model
-vocab_size = AminoAcidTokenizer("iupac1").vocab_size
+# Init model
+vocab_size = AminoAcidTokenizer("aa20").vocab_size
 model = LSTMModel(vocab_size, input_size=64, hidden_size=256, num_layers=3,
-                  hidden_dropout=0.25)
+                  num_outputs=2, hidden_dropout=0.25)
 
 # Init callbacks
-stop_clbk = EarlyStopping(patience=3, verbose=1)
-save_clbk = ModelCheckpoint("bin/3gb1/lstm_fitness/", verbose=1,
-                            save_weights_only=True, prefix="design0")
-# Cumbersome, but required to ensure weights get saved properly.
-# How do we ensure that the model (and its updated weights) are being used
-# everytime we are sampling the new batch?
+# NOTE: Must set model (within save_clbk) to ensure weights get saved
+stop_clbk = EarlyStopping(patience=5, verbose=1)
+save_clbk = ModelCheckpoint("bin/3gb1/lstm/", monitor="val_loss", verbose=1,
+                            save_weights_only=True, prefix="")
 save_clbk.set_model(model)
 
-# Construct loss function and optimizer
-# NOTE: We use MSE loss because although there may be outliers in terms of the
-# variant fitness score (few "great" variants), we still care about them. That
-# is to say, we want the model to "learn" the features that make those protein
-# variants more fit (according to their y score) than other variants.
-criterion = torch.nn.MSELoss(reduction="mean")
+# Construct loss function
+def loss_fn(pred, target, reduction="mean"):
+    """Compute NLL loss of a `N(\\mu,\\sigma^2)` gaussian distribution.
+
+    Usually, when computing the loss between two continous values (for
+    linear regression tasks), we use the mean square error (MSE) loss
+    because, although there may be outliers in terms of the fitness
+    score (aka very few "great" variants), we want to give more weight
+    to the larger differences. That is to say, we want the model to
+    "learn" the features that make those protein variants more "fit"
+    (based off their fitness score) than other variants.
+
+    However, we want to find the ideal paramater `\\theta` that minimizes
+    `y` from the likelihood function `p(y|x, \\theta)`. It can be easily
+    shown that minimizing the NLL of our data with respect to `\\theta`
+    is equivalent to minimizing the MSE between the observed `y` and our
+    prediction. That is, the `\\argmin(NLL)` = `\\argmin(MLE)`.
+
+    See: http://willwolf.io/2017/05/18/minimizing_the_negative_log_likelihood_in_english/
+
+    Params:
+    -------
+    pred: torch.Tensor, size=(N,2)
+        Prediction of the mean and variance of the response variable.
+
+    target: torch.Tensor, size=(N)
+        Ground truth (mean) value.
+
+    reduction: str, default="mean"
+        Specifies the reduction to apply to the output. If "mean", the
+        sum of the output will be divided by the number of elements in
+        the output. If "sum", the output will be summed.
+    """
+    if pred.size(0) != target.size(0):
+        raise ValueError(f"Sizes do not match ({pred.size(0)} != {target.size(0)}).")
+    N = pred.size(0)
+    mu = pred[:, 0]
+    # We use softplus and add 1e-6 to avoid divide by 0 error
+    var = F.softplus(pred[:, 1]) + 1e-6
+    logvar = torch.log(var)
+    target = target.squeeze(1)
+    if reduction == "mean":
+        return 0.5 * torch.log(tensor([math.tau])) + 0.5 * torch.mean(logvar) \
+            + 0.5 * torch.mean(torch.square(target - mu) / var)
+    return 0.5 * N * torch.log(tensor([math.tau])) + 0.5 * torch.sum(logvar) \
+        + torch.sum(torch.square(target - mu) / (2 * var))
+
 optimizer = AdamW(model.parameters(), lr=1e-3)
 
-print(f"Train on {len(train_idx)}, validate on {len(val_idx)}...")
-for epoch in range(1, 16):
-    # Training loop
-    model.train()
-    train_loss = 0
-    for batch_idx, batch in enumerate(train_loader):
-        # Move feats/labels to gpu device (if available)
-        feats, labels = [arr.to(device) for arr in batch.values()]
-        optimizer.zero_grad()                   # zero gradients
-        train_y_pred = model(feats)             # forward pass through model
-        loss = criterion(train_y_pred, labels)  # compute loss
-        loss.backward()                         # compute gradients
-        optimizer.step()                        # update params/weights
+step = 0
+epochs = 15
+for epoch in range(1, epochs+1):
+    for split in splits:
+        summed_loss = 0
+        data_loader = DataLoader(
+            dataset=stratified[split],
+            batch_size=32,
+            sampler=sampler if split == "train" else None,
+            num_workers=mp.cpu_count(),
+            pin_memory=torch.cuda.is_available()
+        )
 
-        # Compute squared error (SE) across whole batch
-        batch_loss = loss.item() * len(labels)
-        train_loss += batch_loss
-        # Print loss (for every kth batch)
-        if batch_idx % 2 == 0:
-            print("Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
-                epoch, batch_idx * len(labels), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item()))
-    # MSE over all training examples
-    print('====> Epoch: {} Average loss: {:.4f}'.format(
-        epoch, train_loss / len(train_loader.dataset)))
+        # Enable/disable dropout
+        model.train() if split == "train" else model.eval()
 
-    # Validation loop
-    model.eval()
-    val_loss = 0
-    with torch.no_grad():
-        for val_batch in val_loader:
-            # Move feats/labels to gpu device (if available)
-            val_feats, val_labels = [arr.to(device) for arr in val_batch.values()]
-            val_y_pred = model(val_feats)
-            loss = criterion(val_y_pred, val_labels)
-            val_loss += loss.item() * len(val_labels)
-    val_loss /= len(val_loader.dataset)
-    print(f'====> Test set loss: {val_loss:.4f}')
+        for it, batch in enumerate(data_loader):
+            # Move data (sequence encoded) to GPU (if available)
+            data, target = [arr.to(device) for arr in batch.values()]
+            batch_size = data.size(0)
 
-    # Stop training (based off val loss) and save (top k) ckpts
-    save_clbk.on_epoch_end(epoch, logs={"val_loss": val_loss})
-    should_stop = stop_clbk.on_epoch_end(epoch, logs={"val_loss": val_loss})
-    if should_stop:
-        break
+            # Forward pass
+            pred = model(data)
+            # Loss calculation
+            nll_loss = loss_fn(pred, target, reduction="sum")
+            summed_loss += nll_loss.item()
+            loss = nll_loss / batch_size
+            # Compute gradients and update params/weights
+            if split == "train":
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                step += 1
+
+            # Bookkeeping (batch)
+            if it % 2 == 0 or it+1 == len(data_loader):
+                print("{} Batch {:04d}/{:d} ({:.2f}%)\tLoss: {:.4f}".format(
+                    split.upper(), it+1, len(data_loader),
+                    100. * ((it+1)/len(data_loader)), loss.item()))
+
+        # Bookkeeping (epoch)
+        avg_loss = summed_loss / len(data_loader.dataset)
+        print("{} Epoch {}/{}, Average NLL loss: {:.4f}".format(
+            split.upper(), epoch, epochs, avg_loss))
+
+        # Stop training (based off val loss) and save (top k) ckpts
+        if split == "valid":
+            save_clbk.on_epoch_end(epoch, logs={"val_loss": avg_loss})
+            should_stop = stop_clbk.on_epoch_end(epoch, logs={"val_loss": avg_loss})
+            if should_stop:
+                break
+    else:
+        continue
+    break

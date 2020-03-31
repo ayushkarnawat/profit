@@ -279,9 +279,9 @@ class LSTMModel(nn.Module):
         # hidden_states = encoded[2:]
         # return (sequence_output, pooled_outputs, hidden_states)
 
-        # NOTE: Since we are only concerned about the value prediction task, we
-        # apply the dense layer ONLY on the pooled embeddings. Additionally,
-        # since this is a regression task, we apply linear (aka no) activation.
+        # NOTE: Since we are only concerned about the prediction task, we apply
+        # the dense layer ONLY on the pooled embeddings. Additionally, since
+        # this is a regression task, we apply the identity function (aka no-op).
         pred = self.out(pooled_outputs)
         return pred
         # prediction, (hidden_states)
