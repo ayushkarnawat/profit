@@ -311,19 +311,20 @@ class ModelCheckpoint(Callback):
             return
         if self.epochs_since_last_check >= self.period:
             self.epochs_since_last_check = 0 # reset
-            filepath = os.path.join(f"{self.savedir}", f"{self.prefix}_epoch{epoch}.pt")
+            filepath = os.path.join(f"{self.savedir}",
+                                    f"{self.prefix}_E{epoch:04d}.pt")
             version_cnt = 0
             while os.path.isfile(filepath):
                 # if this epoch was called before, make versions
-                filepath = os.path.join(f"{self.savedir}", 
-                                        f"{self.prefix}_epoch{epoch}_v{version_cnt}.pt")
+                filepath = os.path.join(f"{self.savedir}",
+                                        f"{self.prefix}_E{epoch:04d}_v{version_cnt:02d}.pt")
                 version_cnt += 1
 
             if self.save_top_k != -1:
                 current = logs.get(self.monitor)
                 if current is None:
-                    warnings.warn(f"Can save best model only with {self.monitor} "
-                                  "available, skipping.", RuntimeWarning)
+                    warnings.warn(f"Can only save best model when {self.monitor} "
+                                  "is available, skipping.", RuntimeWarning)
                 else:
                     if self.check_monitor_top_k(current):
                         # Remove kth model
