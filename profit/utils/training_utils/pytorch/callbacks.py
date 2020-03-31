@@ -292,7 +292,7 @@ class ModelCheckpoint(Callback):
         if self.save_weights_only:
             torch.save(self.model.state_dict(), filepath)
         else:
-            torch.save(model, filepath)
+            torch.save(self.model, filepath)
 
     def check_monitor_top_k(self, current: float) -> bool:
         """Check the quantity monitored for improvement."""
