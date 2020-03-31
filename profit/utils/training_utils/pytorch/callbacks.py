@@ -241,6 +241,7 @@ class ModelCheckpoint(Callback):
         self.save_weights_only = save_weights_only
         self.period = period
         self.prefix = prefix
+        self.sep = "_" if len(self.prefix) > 0 else ""
         self.epochs_since_last_check = 0
         self.best_k_models = {} # {filename: monitor}
         self.kth_best_model = ''
@@ -312,12 +313,13 @@ class ModelCheckpoint(Callback):
         if self.epochs_since_last_check >= self.period:
             self.epochs_since_last_check = 0 # reset
             filepath = os.path.join(f"{self.savedir}",
-                                    f"{self.prefix}_E{epoch:04d}.pt")
+                                    f"{self.prefix}{self.sep}E{epoch:04d}.pt")
             version_cnt = 0
             while os.path.isfile(filepath):
                 # if this epoch was called before, make versions
-                filepath = os.path.join(f"{self.savedir}",
-                                        f"{self.prefix}_E{epoch:04d}_v{version_cnt:02d}.pt")
+                filepath = os.path.join(
+                    f"{self.savedir}",
+                    f"{self.prefix}{self.sep}E{epoch:04d}_v{version_cnt:02d}.pt")
                 version_cnt += 1
 
             if self.save_top_k != -1:
