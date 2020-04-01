@@ -1,13 +1,10 @@
 """Train GB1 LSTM oracle."""
 
-import math
 import multiprocessing as mp
-
 import pandas as pd
 
 import torch
 from torch import optim
-from torch.nn import functional as F
 from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 
 from profit.dataset.splitters import split_method_dict
@@ -15,6 +12,7 @@ from profit.models.pytorch.lstm import LSTMModel
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
 from profit.utils.training_utils.pytorch.callbacks import EarlyStopping
 from profit.utils.training_utils.pytorch.callbacks import ModelCheckpoint
+from profit.utils.training_utils.pytorch import losses as L
 
 from data import load_dataset
 
@@ -60,63 +58,17 @@ sampler = stratified_sampler(stratified["train"][:]["arr_1"].view(-1))
 
 # Init model
 vocab_size = AminoAcidTokenizer("aa20").vocab_size
-model = LSTMModel(vocab_size, input_size=64, hidden_size=256, num_layers=3,
+model = LSTMModel(vocab_size, input_size=64, hidden_size=128, num_layers=2,
                   num_outputs=2, hidden_dropout=0.25)
 
 # Init callbacks
 # NOTE: Must set model (within save_clbk) to ensure weights get saved
 stop_clbk = EarlyStopping(patience=5, verbose=1)
-save_clbk = ModelCheckpoint("bin/3gb1/lstm/", monitor="val_loss", verbose=1,
-                            save_weights_only=True, prefix="")
+save_clbk = ModelCheckpoint("bin/3gb1/lstm", monitor="val_loss", verbose=1,
+                            save_weights_only=False, prefix="")
 save_clbk.set_model(model)
 
-# Construct loss function
-def loss_fn(pred, target, reduction="mean"):
-    """Compute NLL loss of a `N(\\mu,\\sigma^2)` gaussian distribution.
-
-    Usually, when computing the loss between two continous values (for
-    linear regression tasks), we use the mean square error (MSE) loss
-    because, although there may be outliers in terms of the fitness
-    score (aka very few "great" variants), we want to give more weight
-    to the larger differences. That is to say, we want the model to
-    "learn" the features that make those protein variants more "fit"
-    (based off their fitness score) than other variants.
-
-    However, we want to find the ideal paramater `\\theta` that minimizes
-    `y` from the likelihood function `p(y|x, \\theta)`. It can be easily
-    shown that minimizing the NLL of our data with respect to `\\theta`
-    is equivalent to minimizing the MSE between the observed `y` and our
-    prediction. That is, the `\\argmin(NLL)` = `\\argmin(MLE)`.
-
-    See: http://willwolf.io/2017/05/18/minimizing_the_negative_log_likelihood_in_english/
-
-    Params:
-    -------
-    pred: torch.Tensor, size=(N,2)
-        Prediction of the mean and variance of the response variable.
-
-    target: torch.Tensor, size=(N)
-        Ground truth (mean) value.
-
-    reduction: str, default="mean"
-        Specifies the reduction to apply to the output. If "mean", the
-        sum of the output will be divided by the number of elements in
-        the output. If "sum", the output will be summed.
-    """
-    if pred.size(0) != target.size(0):
-        raise ValueError(f"Sizes do not match ({pred.size(0)} != {target.size(0)}).")
-    N = pred.size(0)
-    mu = pred[:, 0]
-    # We use softplus and add 1e-6 to avoid divide by 0 error
-    var = F.softplus(pred[:, 1]) + 1e-6
-    logvar = torch.log(var)
-    target = target.squeeze(1)
-    if reduction == "mean":
-        return 0.5 * torch.log(tensor([math.tau])) + 0.5 * torch.mean(logvar) \
-            + 0.5 * torch.mean(torch.square(target - mu) / var)
-    return 0.5 * N * torch.log(tensor([math.tau])) + 0.5 * torch.sum(logvar) \
-        + torch.sum(torch.square(target - mu) / (2 * var))
-
+# Init callbacks
 optimizer = optim.AdamW(model.parameters(), lr=1e-3)
 
 step = 0
@@ -143,7 +95,7 @@ for epoch in range(1, epochs+1):
             # Forward pass
             pred = model(data)
             # Loss calculation
-            nll_loss = loss_fn(pred, target, reduction="sum")
+            nll_loss = L.gaussian_nll_loss(pred, target, reduction="sum")
             summed_loss += nll_loss.item()
             loss = nll_loss / batch_size
             # Compute gradients and update params/weights

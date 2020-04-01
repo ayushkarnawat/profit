@@ -44,7 +44,6 @@ References:
 
 import os
 import json
-import math
 import time
 import argparse
 
@@ -62,6 +61,7 @@ from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 from profit.dataset.splitters import split_method_dict
 from profit.models.pytorch.vae import SequenceVAE
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
+from profit.utils.training_utils.pytorch import losses as L
 
 from data import load_dataset
 
@@ -116,33 +116,7 @@ def main(args):
     model = SequenceVAE(seqlen, vocab_size, args.hidden_size,
                         args.latent_size).to(device)
 
-    # Anneal KL-divergence term, see: https://arxiv.org/abs/1511.06349
-    def kl_anneal_function(anneal_function, step, k=0.0025, x0=2500):
-        if anneal_function == "logistic":
-            return float(1/(1+math.exp(-k*(step-x0))))
-        elif anneal_function == "linear":
-            return min(1, step/x0)
-
-    # Construct loss function
-    def loss_fn(pred, target, mu, logvar, anneal_function, step, k, x0):
-        """Compute variance of evidence lower bound (ELBO) loss.
-
-        NOTE: The pred values should be logits (raw values). That is, no
-        softmax/log softmax should be applied to the outputs. This is
-        because F.cross_entropy() applies a F.log_softmax() internally
-        before computing the negative log likelihood using F.nll_loss().
-        """
-        # Reconstruction loss
-        # pred=(N,s,b), target=(N,s), where N=batch_size, s=seqlen, b=vocab_size
-        pred = pred.permute(0, 2, 1) # Must be (N,b,s) for F.cross_entropy
-        nll_loss = F.cross_entropy(pred, target, reduction="sum")
-
-        # KL Divergence: 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-        kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-        kl_weight = kl_anneal_function(anneal_function, step, k, x0)
-
-        return nll_loss, kl_loss, kl_weight
-
+    # Initialize optimizer
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
 
     # Logging dir
@@ -190,8 +164,8 @@ def main(args):
                 # Forward pass
                 pred, mu, logvar, z = model(onehot)
                 # Loss calculation
-                nll_loss, kl_loss, kl_weight = loss_fn(pred, data, mu, logvar, \
-                    args.anneal_function, step, args.k, args.x0)
+                nll_loss, kl_loss, kl_weight = L.elbo_loss(pred, data, mu, \
+                    logvar, args.anneal_function, step, args.k, args.x0)
                 loss = (nll_loss + kl_weight * kl_loss) / batch_size
                 # Compute gradients and update params/weights
                 if split == "train":
