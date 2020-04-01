@@ -6,6 +6,7 @@ import multiprocessing as mp
 import pandas as pd
 
 import torch
+from torch import optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 
@@ -14,7 +15,6 @@ from profit.models.pytorch.lstm import LSTMModel
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
 from profit.utils.training_utils.pytorch.callbacks import EarlyStopping
 from profit.utils.training_utils.pytorch.callbacks import ModelCheckpoint
-from profit.utils.training_utils.pytorch.optimizers import AdamW
 
 from data import load_dataset
 
@@ -117,7 +117,7 @@ def loss_fn(pred, target, reduction="mean"):
     return 0.5 * N * torch.log(tensor([math.tau])) + 0.5 * torch.sum(logvar) \
         + torch.sum(torch.square(target - mu) / (2 * var))
 
-optimizer = AdamW(model.parameters(), lr=1e-3)
+optimizer = optim.AdamW(model.parameters(), lr=1e-3)
 
 step = 0
 epochs = 15

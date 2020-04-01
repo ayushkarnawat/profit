@@ -55,13 +55,13 @@ import pandas as pd
 from tensorboardX import SummaryWriter
 
 import torch
+from torch import optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 
 from profit.dataset.splitters import split_method_dict
 from profit.models.pytorch.vae import SequenceVAE
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
-from profit.utils.training_utils.pytorch.optimizers import AdamW
 
 from data import load_dataset
 
@@ -143,7 +143,7 @@ def main(args):
 
         return nll_loss, kl_loss, kl_weight
 
-    optimizer = AdamW(model.parameters(), lr=args.learning_rate)
+    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
 
     # Logging dir
     if args.tensorboard_logging:

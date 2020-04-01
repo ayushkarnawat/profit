@@ -1,13 +1,13 @@
 """Train GB1 protein engineering model."""
 
 import torch
+from torch import optim
 from torch.utils.data import DataLoader, Subset
 
 from profit.dataset.splitters import split_method_dict
 from profit.models.pytorch.egcn import EmbeddedGCN
 from profit.utils.training_utils.pytorch.callbacks import EarlyStopping
 from profit.utils.training_utils.pytorch.callbacks import ModelCheckpoint
-from profit.utils.training_utils.pytorch.optimizers import AdamW
 
 from data import load_dataset
 
@@ -55,7 +55,7 @@ save_clbk.set_model(model)
 
 # Construct loss function and optimizer
 criterion = torch.nn.MSELoss(reduction='sum')
-optimizer = AdamW(model.parameters(), lr=1e-4)
+optimizer = optim.AdamW(model.parameters(), lr=1e-4)
 
 print(f'Train on {len(train_idx)}, validate on {len(val_idx)}...')
 for epoch in range(5):
