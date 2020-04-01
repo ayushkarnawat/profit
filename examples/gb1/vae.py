@@ -60,6 +60,7 @@ from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 
 from profit.dataset.splitters import split_method_dict
 from profit.models.pytorch.vae import SequenceVAE
+from profit.utils.data_utils import VOCABS
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
 from profit.utils.training_utils.pytorch import losses as L
 
@@ -197,15 +198,13 @@ def main(args):
                               kl_loss.item() / batch_size, kl_weight))
 
                 if split == "valid":
-                    # # Apply softmax to convert logits -> prob to reconstruct seqs
-                    # recon_seqs = torch.argmax(F.softmax(pred), dim=-1)
-
-                    # HACK(THIS IS WRONG): When using the AA20 vocab, to avoid
-                    # having <pad>/<unk> in our reconstruction vocab, we eliminate
-                    # their softmax prediction by removing them (pred[..., 2:]).
-                    # Alternatively, we could check what unique target values are
-                    # and keep only the probabilty from those predictions.
-                    recon_seqs = torch.argmax(F.softmax(pred)[..., 2:], dim=-1) + 2
+                    # Apply softmax to convert logits -> probs to reconstruct seqs
+                    # NOTE: If we have certain tokens in our vocab that we do not
+                    # want to include in the reconstruction (i.e. <pad>/<unk>),
+                    # we have to remove their softmax prediction. Otherwise, the
+                    # model will have a good chance of generating seqs with some
+                    # of those vocabs included.
+                    recon_seqs = torch.argmax(F.softmax(pred), dim=-1)
 
                     if "recon_seqs" not in tracker:
                         tracker["recon_seqs"] = list()
@@ -277,7 +276,7 @@ if __name__ == "__main__":
     args.vocab = args.vocab.lower()
     args.anneal_function = args.anneal_function.lower()
 
-    assert args.vocab in ["iupac1", "iupac3", "aa20"]
+    assert args.vocab in VOCABS
     assert args.anneal_function in ["logistic", "linear"]
 
     main(args)

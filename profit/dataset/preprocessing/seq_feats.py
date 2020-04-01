@@ -102,8 +102,14 @@ def construct_embedding(seq: Union[str, List[str]],
         raise NotImplementedError
 
     # Pad (w/ zero) to defined size
-    full_size = [size] + list(embedding[:].shape[1:])
-    pad_width = [(0, full_size[i] - embedding[:].shape[i]) for i in range(embedding.ndim)]
-    padded_embed = np.pad(embedding, pad_width, mode="constant", \
-        constant_values=tokenizer.convert_token_to_id(tokenizer.pad_token))
+    try:
+        full_size = [size] + list(embedding[:].shape[1:])
+        pad_width = [(0, full_size[i] - embedding[:].shape[i]) for i in range(embedding.ndim)]
+        padded_embed = np.pad(embedding, pad_width, mode="constant", \
+            constant_values=tokenizer.convert_token_to_id(tokenizer.pad_token))
+    except RuntimeError as e:
+        # If there is no padding token
+        if out_size > 0:
+            print(f"Cannot pad to out_size={out_size} because {str(e)}")
+        padded_embed = embedding
     return padded_embed

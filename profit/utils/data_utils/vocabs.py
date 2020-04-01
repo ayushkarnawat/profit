@@ -1,11 +1,13 @@
 """Different vocab types."""
 
 from collections import OrderedDict
+from profit.peptide_builder.polypeptides import aa1, aa3
+
 
 # See: https://www.dnastar.com/megalign_help/index.html#!Documents/iupaccodesforaminoacids.htm
-IUPAC_AA_CODES = OrderedDict([
+_IUPAC_AA_CODES = OrderedDict([
     ("ALA", "A"),
-    ("ASX", "B"),
+    # ("ASX", "B"), # Aspartic Acid or Asparagine
     ("CYS", "C"),
     ("ASP", "D"),
     ("GLU", "E"),
@@ -13,89 +15,65 @@ IUPAC_AA_CODES = OrderedDict([
     ("GLY", "G"),
     ("HIS", "H"),
     ("ILE", "I"),
-    ("XLE", "J"),
+    # ("XLE", "J"), # Leucine or Isoleucine
     ("LYS", "K"),
     ("LEU", "L"),
     ("MET", "M"),
     ("ASN", "N"),
+    ("PYL", "O"), # synthetic; genetically encoded
     ("PRO", "P"),
     ("GLN", "Q"),
     ("ARG", "R"),
     ("SER", "S"),
     ("THR", "T"),
-    ("SEC", "U"),
+    ("SEC", "U"), # synthetic; genetically encoded
     ("VAL", "V"),
     ("TRP", "W"),
-    ("XAA", "X"),
+    # ("XAA", "X"), # Unspecified or unknown
     ("TYR", "Y"),
-    ("GLX", "Z")
+    # ("GLX", "Z"), # Glutamic Acid or Glutamine
 ])
 
-IUPAC_AA1_VOCAB = OrderedDict([
-    ("<pad>", 0),   # padding token
-    ("<mask>", 1),  # hidden (masked) token
-    ("<cls>", 2),   # classification token (beginning of sentence)
-    ("<sep>", 3),   # seperation token (end of sentence)
-    ("<unk>", 4),   # unknown token
-    ("A", 5),
-    ("B", 6),
-    ("C", 7),
-    ("D", 8),
-    ("E", 9),
-    ("F", 10),
-    ("G", 11),
-    ("H", 12),
-    ("I", 13),
-    ("J", 14),
-    ("K", 15),
-    ("L", 16),
-    ("M", 17),
-    ("N", 18),
-    ("O", 19),
-    ("P", 20),
-    ("Q", 21),
-    ("R", 22),
-    ("S", 23),
-    ("T", 24),
-    ("U", 25),
-    ("V", 26),
-    ("W", 27),
-    ("X", 28),
-    ("Y", 29),
-    ("Z", 30)
-])
 
-IUPAC_AA3_VOCAB = OrderedDict([
-    ("<pad>", 0),   # padding token
-    ("<mask>", 1),  # hidden (masked) token
-    ("<cls>", 2),   # classification token (beginning of sentence)
-    ("<sep>", 3),   # seperation token (end of sentence)
-    ("<unk>", 4),   # unknown token
-])
-IUPAC_AA3_VOCAB.update({k:IUPAC_AA1_VOCAB.get(v) for k, v in IUPAC_AA_CODES.items()})
-
-
-AA20_VOCAB = OrderedDict([
+_BASE_STUB = OrderedDict([
     ("<pad>", 0),   # padding token
     ("<unk>", 1),   # unknown token
-    ("A", 2),
-    ("C", 3),
-    ("D", 4),
-    ("E", 5),
-    ("F", 6),
-    ("G", 7),
-    ("H", 8),
-    ("I", 9),
-    ("K", 10),
-    ("L", 11),
-    ("M", 12),
-    ("N", 13),
-    ("P", 14),
-    ("Q", 15),
-    ("R", 16),
-    ("S", 17),
-    ("T", 18),
-    ("V", 19),
-    ("W", 20),
-    ("Y", 21),
 ])
+
+_BERT_STUB = _BASE_STUB.copy()
+_BERT_STUB.update([
+    ("<mask>", 2),  # hidden (masked) token
+    ("<cls>", 3),   # classification token (beginning of sentence)
+    ("<sep>", 4),   # seperation token (end of sentence)
+])
+
+IUPAC_AA1 = _BERT_STUB.copy()
+IUPAC_AA1.update({
+    aa1: len(IUPAC_AA1)+i for i, aa1 in enumerate(_IUPAC_AA_CODES.values())
+})
+
+IUPAC_AA3 = _BERT_STUB.copy()
+IUPAC_AA3.update({
+    aa3: len(IUPAC_AA3)+i for i, aa3 in enumerate(_IUPAC_AA_CODES.keys())
+})
+
+NATURAL_AA1 = _BASE_STUB.copy()
+NATURAL_AA1.update({aa: len(NATURAL_AA1)+i for i, aa in enumerate(aa1)})
+
+NATURAL_AA3 = _BASE_STUB.copy()
+NATURAL_AA3.update({aa: len(NATURAL_AA3)+i for i, aa in enumerate(aa3)})
+
+# We do not require this vocab to have the base stub (aka <pad>, <unk>) since we
+# assume that there will be no variable length sequences and no unknown tokens.
+ONLY_AA20 = OrderedDict({aa: i for i, aa in enumerate(aa1)})
+
+
+# NOTE: We must define all vocabs here rather than within the parent directory's
+# __init__ because we want to use them in tokenizers
+VOCABS = {
+    "iupac1": IUPAC_AA1,
+    "iupac3": IUPAC_AA3,
+    "aa1": NATURAL_AA1,
+    "aa3": NATURAL_AA3,
+    "aa20": ONLY_AA20,
+}

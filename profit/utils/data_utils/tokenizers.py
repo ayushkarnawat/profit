@@ -1,15 +1,15 @@
-"""Different types of sequence tokenizers/encoders/decoders available.
+"""Tokenizers, encoders, and decoders.
 
-TODO: Should we make a special tokenizer for BERT sequences. Allows us 
-to represent different encoding/decodings for BERT-like tasks.
+TODO: Should there be a special tokenizer for BERT sequences? It would
+allow us to represent different encoding/decodings for BERT-like tasks.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Union
+from typing import List, Union
 
 import numpy as np
 
-from profit.utils.data_utils import vocabs
+from profit.utils.data_utils.vocabs import VOCABS
 
 
 class BaseTokenizer(ABC):
@@ -20,10 +20,12 @@ class BaseTokenizer(ABC):
 
     @abstractmethod
     def encode(self, text: str) -> np.ndarray:
+        """Encode text into ints (based off vocab)."""
         raise NotImplementedError
-    
+
     @abstractmethod
-    def decode(self, tokens: List[int]) -> str:
+    def decode(self, ids: List[int]) -> str:
+        """Decode token ids back into tokens representation."""
         raise NotImplementedError
 
 
@@ -31,17 +33,14 @@ class AminoAcidTokenizer(BaseTokenizer):
     """Tokenizer for amino acid sequences."""
 
     def __init__(self, vocab: str):
-        if vocab == "iupac1":
-            self.vocab: Dict[str, Any] = vocabs.IUPAC_AA1_VOCAB
-        elif vocab == "iupac3":
-            self.vocab: Dict[str, Any] = vocabs.IUPAC_AA3_VOCAB
-        elif vocab == "aa20":
-            self.vocab: Dict[str, Any] = vocabs.AA20_VOCAB
+        super(AminoAcidTokenizer, self).__init__()
+
+        if vocab in VOCABS.keys():
+            self.vocab = VOCABS[vocab]
         else:
             raise ValueError(f"vocab={vocab} is unavailable.")
-        self.flipped_vocab = {v:k for k,v in self.vocab.items()}
+        self.flipped_vocab = {v:k for k, v in self.vocab.items()}
         self._vocab_type = vocab
-        assert self.pad_token in self.vocab and self.unknown_token in self.vocab
 
     @property
     def vocab_size(self) -> int:
@@ -51,8 +50,8 @@ class AminoAcidTokenizer(BaseTokenizer):
     def start_token(self) -> str:
         if "<cls>" in self.vocab:
             return "<cls>"
-        raise RuntimeError(f"{self._vocab_type} vocab does not support BERT " \
-            "classification (start) token.")
+        raise RuntimeError(f"{self._vocab_type} vocab does not support BERT "
+                           "classification (start) token.")
 
     @property
     def stop_token(self) -> str:
@@ -63,16 +62,20 @@ class AminoAcidTokenizer(BaseTokenizer):
     @property
     def mask_token(self) -> str:
         if "<mask>" in self.vocab:
-            return "<mask>" 
+            return "<mask>"
         raise RuntimeError(f"{self._vocab_type} vocab does not support masking.")
 
     @property
     def pad_token(self) -> str:
-        return "<pad>"
+        if "<pad>" in self.vocab:
+            return "<pad>"
+        raise RuntimeError(f"{self._vocab_type} vocab does not support padding.")
 
     @property
     def unknown_token(self) -> str:
-        return "<unk>"
+        if "<unk>" in self.vocab:
+            return "<unk>"
+        raise RuntimeError(f"{self._vocab_type} vocab does not support unknown tokens.")
 
     @staticmethod
     def tokenize(text: str) -> List[str]:
@@ -82,16 +85,19 @@ class AminoAcidTokenizer(BaseTokenizer):
 
     def convert_token_to_id(self, token: str) -> int:
         """Converts a token (str/unicode) into an id using the vocab.
-        
+
         NOTE: Tokens are case-sensitive, i.e. 'Ala' != 'ALA'.
         """
         try:
             return self.vocab[token]
         except KeyError:
-            # We know that the unknown token has to exist, since we check for it
-            # when the tokenizer is initialized.
-            print(f"Unrecognized token `{token}`. Using {self.unknown_token} instead!")
-            return self.vocab[self.unknown_token]
+            try:
+                print(f"Unrecognized token `{token}`, using {self.unknown_token} instead!")
+                return self.vocab[self.unknown_token]
+            except RuntimeError as e:
+                # If there is no unknown token, return an error (since we still
+                # want to warn the user that the <unk> token was not used).
+                raise RuntimeError(f"Unrecognized token `{token}` - {str(e)}")
 
 
     def convert_id_to_token(self, id_: int) -> str:
@@ -107,9 +113,9 @@ class AminoAcidTokenizer(BaseTokenizer):
 
 
     def add_special_tokens(self, token_ids: List[str]) -> List[str]:
-        """Adds special tokens to the sequence. 
-        
-        Used for sequence classification tasks (specifically BERT-like 
+        """Adds special tokens to the sequence.
+
+        Used for sequence classification tasks (specifically BERT-like
         tasks). A BERT sequence has the following format: [CLS] X [SEP].
         """
         cls_token = [self.start_token]
@@ -125,5 +131,5 @@ class AminoAcidTokenizer(BaseTokenizer):
 
 
     def decode(self, ids: List[int]) -> List[str]:
-        """Decode ids back into tokens representation."""
+        """Decode token ids back into tokens representation."""
         return [self.convert_id_to_token(id_) for id_ in ids]

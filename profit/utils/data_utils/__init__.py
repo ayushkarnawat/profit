@@ -31,9 +31,7 @@ from profit.utils.data_utils.tfreader import tfrecord_loader
 from profit.utils.data_utils.tokenizers import BaseTokenizer
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
 
-from profit.utils.data_utils.vocabs import IUPAC_AA_CODES
-from profit.utils.data_utils.vocabs import IUPAC_AA1_VOCAB
-from profit.utils.data_utils.vocabs import IUPAC_AA3_VOCAB
+from profit.utils.data_utils.vocabs import VOCABS
 
 serialize_method_dict = {
     "h5": HDF5Serializer,
