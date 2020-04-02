@@ -260,7 +260,7 @@ if __name__ == "__main__":
     # parser.add_argument("-eb", "--embedding_size", type=int, default=300)
     parser.add_argument("-vb", "--vocab", type=str, default="aa20")
     parser.add_argument("-hs", "--hidden_size", type=int, default=64)
-    parser.add_argument("-ls", "--latent_size", type=int, default=10)
+    parser.add_argument("-ls", "--latent_size", type=int, default=20)
 
     parser.add_argument("-af", "--anneal_function", type=str, default="logistic")
     parser.add_argument("-k", "--k", type=float, default=0.0025)
@@ -268,9 +268,9 @@ if __name__ == "__main__":
 
     parser.add_argument("-v", "--print_every", type=int, default=5)
     parser.add_argument("-tb", "--tensorboard_logging", action="store_true")
-    parser.add_argument("-log", "--logdir", type=str, default="logs/vae")
-    parser.add_argument("-bin", "--save_model_path", type=str, default="bin/vae")
-    parser.add_argument("-dump", "--dumpdir", type=str, default="dumps/vae")
+    parser.add_argument("-log", "--logdir", type=str, default="logs/3gb1/vae")
+    parser.add_argument("-bin", "--save_model_path", type=str, default="bin/3gb1/vae")
+    parser.add_argument("-dump", "--dumpdir", type=str, default="dumps/3gb1/vae")
 
     args = parser.parse_args()
     args.vocab = args.vocab.lower()
