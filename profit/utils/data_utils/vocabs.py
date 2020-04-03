@@ -7,31 +7,31 @@ from profit.peptide_builder.polypeptides import aa1, aa3
 # See: https://www.dnastar.com/megalign_help/index.html#!Documents/iupaccodesforaminoacids.htm
 _IUPAC_AA_CODES = OrderedDict([
     ("ALA", "A"),
+    ("ARG", "R"),
+    ("ASN", "N"),
+    ("ASP", "D"),
     # ("ASX", "B"), # Aspartic Acid or Asparagine
     ("CYS", "C"),
-    ("ASP", "D"),
+    ("GLN", "Q"),
     ("GLU", "E"),
-    ("PHE", "F"),
+    # ("GLX", "Z"), # Glutamic Acid or Glutamine
     ("GLY", "G"),
     ("HIS", "H"),
     ("ILE", "I"),
-    # ("XLE", "J"), # Leucine or Isoleucine
-    ("LYS", "K"),
     ("LEU", "L"),
+    ("LYS", "K"),
     ("MET", "M"),
-    ("ASN", "N"),
-    ("PYL", "O"), # synthetic; genetically encoded
+    ("PHE", "F"),
     ("PRO", "P"),
-    ("GLN", "Q"),
-    ("ARG", "R"),
+    ("PYL", "O"), # synthetic; genetically encoded
+    ("SEC", "U"), # synthetic; genetically encoded
     ("SER", "S"),
     ("THR", "T"),
-    ("SEC", "U"), # synthetic; genetically encoded
-    ("VAL", "V"),
     ("TRP", "W"),
-    # ("XAA", "X"), # Unspecified or unknown
     ("TYR", "Y"),
-    # ("GLX", "Z"), # Glutamic Acid or Glutamine
+    ("VAL", "V"),
+    # ("XAA", "X"), # Unspecified or unknown
+    # ("XLE", "J"), # Leucine or Isoleucine
 ])
 
 
