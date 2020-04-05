@@ -28,9 +28,9 @@ splits = ["train", "valid"]
 dataset = load_dataset("lstm", "primary", labels="Fitness", num_data=-1,
                        filetype="mdb", as_numpy=False, vocab="aa20")
 
-# Stratify train/val/test sets s.t. the target labels are equally represented
-# in each subset. Each subset will have the same ratio of low/mid/high variants
-# in each batch as the full dataset. See: https://discuss.pytorch.org/t/29907/2
+# Stratify train/val/test sets s.t. the target labels are equally represented in
+# each subset. Each subset will have the same ratio of low/mid/high variants in
+# each batch as the full dataset. See: https://discuss.pytorch.org/t/29907/2
 _dataset = dataset[:]["arr_0"]
 _labels = dataset[:]["arr_1"].view(-1)
 # Create subset indicies
