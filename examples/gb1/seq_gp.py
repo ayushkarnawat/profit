@@ -10,9 +10,9 @@ from profit.utils.data_utils.substitution_matrices import BLOSUM62
 class SequenceGPR:
     r"""Gaussian process regression (GPR) for amino acid sequences.
 
-    The covariance matrix is computed by applying a variant of the
-    BLOSUM (amino acid substitution) matrix between inputs :math:
-    `\mathbf{x}` and :math:`\mathbf{y}` [1]:
+    The covariance matrix is computed by applying a variant of the amino
+    acid SUbstitution Matrix (SUM) between inputs :math:`\mathbf{x}` and
+    :math:`\mathbf{y}` [1]:
 
     .. math::
 
@@ -36,7 +36,7 @@ class SequenceGPR:
 
     Params:
     -------
-    sub_mat: np.ndarray, default=None
+    smatrix: np.ndarray, default=None
         The amino acid substitution matrix. Denotes the substitution
         probability between each of the 20 natural amino acids. If None,
         uses BLOSUM62 matrix.
@@ -63,12 +63,13 @@ class SequenceGPR:
     """
 
     def __init__(self,
-                 sub_mat: typing.Optional[np.ndarray] = None,
+                 smatrix: typing.Optional[np.ndarray] = None,
                  alpha: float = 0.1,
                  beta: float = 0.1,
                  gamma: float = 1.0) -> None:
-        if sub_mat is None: sub_mat = BLOSUM62
-        self.sub_mat = sub_mat
+        if smatrix is None:
+            smatrix = BLOSUM62
+        self.smatrix = smatrix
         self.alpha = alpha
         self.beta = beta
         self.gamma = gamma
@@ -81,15 +82,15 @@ class SequenceGPR:
 
 
     # def _kernel(self, Xi, Xj):
-    #     # Check if all values in Xi, Xj are <= len(sub_mat)
-    #     assert all(i < len(self.sub_mat) for i in Xi)
-    #     assert all(i < len(self.sub_mat) for i in Xj)
+    #     # Check if all values in Xi, Xj are <= len(smatrix)
+    #     assert all(i < len(self.smatrix) for i in Xi)
+    #     assert all(i < len(self.smatrix) for i in Xj)
 
     #     # Retrieve the substitution prob/covariance between the AAs based off
     #     # the vocab index.
-    #     kij = np.prod(self.sub_mat[[Xi, Xj]]**self.beta)
-    #     kii = np.prod(self.sub_mat[[Xi, Xi]]**self.beta)
-    #     kjj = np.prod(self.sub_mat[[Xj, Xj]]**self.beta)
+    #     kij = np.prod(self.smatrix[[Xi, Xj]]**self.beta)
+    #     kii = np.prod(self.smatrix[[Xi, Xi]]**self.beta)
+    #     kjj = np.prod(self.smatrix[[Xj, Xj]]**self.beta)
     #     # Normalize the kernel, following Shawe-Taylor J., Cristianini N. (2004)
     #     # Kernel Methods for Pattern Analysis. Cambridge University Press.
     #     k = kij / (np.sqrt(kii*kjj))
@@ -113,11 +114,11 @@ class SequenceGPR:
                           f"`{str(x_train.dtype)}`; converting to ints.")
             x_train = x_train.astype(np.int)
 
-        # Check if each value is 0 <= x_train[i] < len(sub_mat). This is because
+        # Check if each value is 0 <= x_train[i] < len(smatrix). This is because
         # x_train represents indicies of the vocab (i.e. amino acids).
-        if not np.all(x_train >= 0) and np.all(x_train < self.sub_mat.shape[0]):
+        if not np.all(x_train >= 0) and np.all(x_train < self.smatrix.shape[0]):
             raise ValueError("Check input x_train - all value should be [0, "
-                             f"{self.sub_mat.shape[0]}).")
+                             f"{self.smatrix.shape[0]}).")
 
         # Save params for prediction
         self.X_ = x_train
@@ -133,9 +134,9 @@ class SequenceGPR:
         # Compute covariance kernel k_{BLOSUM}(x,y)
         # Retrieve substitution prob (between AAs at same position
         # between 2 sequences) across all amino acids.
-        kij = np.prod(self.sub_mat[(x1, x2)]**self.beta, axis=-1)
-        kii = np.prod(self.sub_mat[(x1, x1)]**self.beta, axis=-1)
-        kjj = np.prod(self.sub_mat[(x2, x2)]**self.beta, axis=-1)
+        kij = np.prod(self.smatrix[(x1, x2)]**self.beta, axis=-1)
+        kii = np.prod(self.smatrix[(x1, x1)]**self.beta, axis=-1)
+        kjj = np.prod(self.smatrix[(x2, x2)]**self.beta, axis=-1)
         k = kij / (np.sqrt(kii*kjj))            # normalize kernel
         noise = self.alpha * np.eye(k.shape[0]) # noise along diag
         self.k_ = np.exp(self.gamma*k) + noise
@@ -173,11 +174,11 @@ class SequenceGPR:
                           f"`{str(x_star.dtype)}`; converting to ints.")
             x_star = x_star.astype(np.int)
 
-        # Check if each value is 0 <= x_star[i] < len(sub_mat). This is because
+        # Check if each value is 0 <= x_star[i] < len(smatrix). This is because
         # x_star represents indicies of the vocab (i.e. amino acids).
-        if not np.all(x_star >= 0) and np.all(x_star < self.sub_mat.shape[0]):
+        if not np.all(x_star >= 0) and np.all(x_star < self.smatrix.shape[0]):
             raise ValueError("Check input x_train - all value should be [0, "
-                             f"{self.sub_mat.shape[0]}).")
+                             f"{self.smatrix.shape[0]}).")
 
         # Repeat x1 along dim=1 (similarly x2 along dim=0) so that we can
         # compute covariance between x_star and x_train (denoted X_{ij})
@@ -188,9 +189,9 @@ class SequenceGPR:
         x2 = np.tile(np.expand_dims(self.X_, axis=0), reps=(M, 1, 1))
 
         # Compute kernel k_{BLOSUM}(x*, x_train)
-        kij = np.prod(self.sub_mat[(x1, x2)]**self.beta, axis=-1)
-        kii = np.prod(self.sub_mat[(x1, x1)]**self.beta, axis=-1)
-        kjj = np.prod(self.sub_mat[(x2, x2)]**self.beta, axis=-1)
+        kij = np.prod(self.smatrix[(x1, x2)]**self.beta, axis=-1)
+        kii = np.prod(self.smatrix[(x1, x1)]**self.beta, axis=-1)
+        kjj = np.prod(self.smatrix[(x2, x2)]**self.beta, axis=-1)
         k = kij / (np.sqrt(kii*kjj)) # normalize kernel
         k_star = np.exp(self.gamma*k)
 
