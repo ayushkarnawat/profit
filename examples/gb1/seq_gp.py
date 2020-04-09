@@ -97,7 +97,7 @@ class SequenceGPR:
     #     return np.exp(self.gamma*k)
 
 
-    def fit(self, x_train: np.ndarray, y_train: np.ndarray):
+    def fit(self, x_train: np.ndarray, y_train: np.ndarray) -> None:
         r"""Compute the covariance kernel.
 
         Params:
@@ -143,7 +143,6 @@ class SequenceGPR:
 
         # Invert covariance kernel k; needed for prediction
         self.kinv_ = np.linalg.inv(self.k_)
-        return self
 
 
     def predict(self, x_star: np.ndarray,
