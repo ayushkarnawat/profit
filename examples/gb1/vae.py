@@ -198,13 +198,13 @@ def main(args):
                               kl_loss.item() / batch_size, kl_weight))
 
                 if split == "valid":
-                    # Apply softmax to convert logits -> probs to reconstruct seqs
-                    # NOTE: If we have certain tokens in our vocab that we do not
-                    # want to include in the reconstruction (i.e. <pad>/<unk>),
-                    # we have to remove their softmax prediction. Otherwise, the
-                    # model will have a good chance of generating seqs with some
-                    # of those vocabs included.
-                    recon_seqs = torch.argmax(F.softmax(pred), dim=-1)
+                    # Apply softmax to convert logits -> probs (across each
+                    # amino acid) to reconstruct seqs. NOTE: If we have certain
+                    # tokens in our vocab that we do not want to include in the
+                    # reconstruction (i.e. <pad>/<unk>), we have to remove their
+                    # softmax prediction. Otherwise, the model might generate
+                    # sequences with some of those vocab included.
+                    recon_seqs = torch.argmax(F.softmax(pred, dim=-1), dim=-1)
 
                     if "recon_seqs" not in tracker:
                         tracker["recon_seqs"] = list()
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_size", type=float, default=0., nargs='?', const=1)
 
     parser.add_argument("-ep", "--epochs", type=int, default=50)
-    parser.add_argument("-bs", "--batch_size", type=int, default=16)
+    parser.add_argument("-bs", "--batch_size", type=int, default=32)
     parser.add_argument("-lr", "--learning_rate", type=float, default=1e-3)
 
     # NOTE: Instead of defining the embedding_size (usually same as num_vocab
