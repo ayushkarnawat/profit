@@ -50,6 +50,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from profit.models.pytorch.vae import SequenceVAE
 from profit.models.pytorch.lstm import LSTMModel
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
+from profit.utils.testing_utils import avg_oracle_preds
 from profit.utils.training_utils.pytorch import losses as L
 
 from examples.gb1.data import load_dataset
@@ -116,7 +117,7 @@ for t in range(20):
         # vocab.
         vae.eval()
         with torch.no_grad():
-            # Compute softmax across each amino acid in the sequence
+            # Compute softmax (logits -> probs) across each amino acid
             Xt_p = F.softmax(vae.decode(zt), dim=-1)
         if sample:
             # Sample from the computed probs to make potential sequences that
@@ -135,12 +136,11 @@ for t in range(20):
         Xt = _dataset
 
     # Evaluate sampled points on oracle(s) and ground truth (aka GP)
-    # NOTE: If using multiple oracles, we should (a) average the predictions (mu
-    # and var) and (b) NOT impute homoscedastic noise.
-    oracle.eval()
-    with torch.no_grad():
-        pred = oracle(Xt)
-    yt, yt_var = pred[:, 0], pred[:, 1]
+    # oracle.eval()
+    # with torch.no_grad():
+    #     pred = oracle(Xt)
+    # yt, yt_var = pred[:, 0], pred[:, 1]
+    yt, yt_var = avg_oracle_preds(oracle, Xt)
     if homoscedastic:
         yt_var = torch.ones_like(yt) * homo_y_var
     # Determine ground truth values
