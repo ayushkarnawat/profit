@@ -45,7 +45,7 @@ import scipy.stats
 import torch
 from torch import optim
 from torch.nn import functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 from profit.models.pytorch.vae import SequenceVAE
 from profit.models.pytorch.lstm import LSTMModel
@@ -60,6 +60,9 @@ ts = time.strftime("%Y-%b-%d-%H:%M:%S", time.gmtime())
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
 
+# For sampling the probs computed
+sample = True
+
 # FOR ORACLE MODEL(S)
 num_oracles = 1
 homoscedastic = num_oracles == 1
@@ -68,6 +71,7 @@ homo_y_var = 0.1
 # For weights
 quantile = 0.95
 threshold = 1e-6
+
 
 # Preprocess + load the dataset
 dataset = load_dataset("lstm", "primary", labels="Fitness", num_data=-1,
@@ -81,12 +85,12 @@ vocab_size = tokenizer.vocab_size
 seqlen = _dataset.size(1)
 vae = SequenceVAE(seqlen, vocab_size, hdim=64, latent_size=20)
 vae_0 = copy.deepcopy(vae)
-vae_0.load_state_dict(torch.load("bin/3gb1/vae/2020-Apr-08-17:53:11/E0020.pt"))
+vae_0.load_state_dict(torch.load("bin/3gb1/vae/2020-Apr-08-17:53:11/E0025.pt"))
 
 # Initialize and load weights (oracle)
 oracle = LSTMModel(vocab_size, input_size=64, hidden_size=128, num_layers=2,
                    num_outputs=2, hidden_dropout=0.25)
-oracle.load_state_dict(torch.load("bin/3gb1/lstm/2020-Apr-08-17:36:05/E0002.pt"))
+oracle.load_state_dict(torch.load("bin/3gb1/lstm/2020-Apr-09-19:10:34/E0011.pt"))
 
 # Train GPR using BLOSUM62 substitution matrix
 gp = SequenceGPR()
@@ -103,8 +107,8 @@ y_star = -np.inf
 
 # Iteratively generate new samples and determine their fitness
 for t in range(20):
-    # Sample plausible seqs from the latent distribution
-    zt = torch.randn(32, 20) # size=(samples=32, latent_size=20)
+    # Sample (plausible) sequences from the latent distribution z
+    zt = torch.randn(50, 20) # size=(samples=32, latent_size=20)
     if t > 0:
         # Since we don't perform any activation on the outputs of the generative
         # model initially (this is due to how the cross_entropy loss is computed
@@ -112,12 +116,21 @@ for t in range(20):
         # vocab.
         vae.eval()
         with torch.no_grad():
-            # Compute softmax across amino acid in the sequence
+            # Compute softmax across each amino acid in the sequence
             Xt_p = F.softmax(vae.decode(zt), dim=-1)
-        Xt = torch.argmax(Xt_p, dim=-1) # convert from onehot -> seqs
-
-        # NOTE: Alternatively, we could also sample from the computed probs to
-        # make potential sequences that are outside our learned representation.
+        if sample:
+            # Sample from the computed probs to make potential sequences that
+            # are outside our learned representation (strategy used by CbAS).
+            Xt_sampled = torch.zeros_like(Xt_p)
+            for i in range(Xt_p.size(0)):
+                for j in range(Xt_p.size(1)):
+                    p = Xt_p[i, j].numpy()
+                    k = np.random.choice(range(len(p)), p=p)
+                    Xt_sampled[i, j, k] = 1.
+            Xt = torch.argmax(Xt_sampled, dim=-1)
+        else:
+            # Select the vocab wih the highest probability
+            Xt = torch.argmax(Xt_p, dim=-1) # convert from onehot -> seqs
     else:
         Xt = _dataset
 
@@ -163,7 +176,7 @@ for t in range(20):
         weights = torch.ones(yt.shape[0])
 
     # Bookkeeping
-    print(weights) # TODO: Remove
+    print(t, weights) # TODO: Remove
     # HMMMM, for some reason it is not getting good weights (and subsequently
     # good predictions from oracle for the new points sampled) after first iteration
     yt_max_idx = torch.argmax(yt)
@@ -173,6 +186,11 @@ for t in range(20):
         oracle_max_seq = "".join(tokenizer.decode(Xt[yt_max_idx].numpy()))
         gt_of_oracle_max = yt_gt[yt_max_idx]
         print(oracle_max_seq, oracle_max, gt_of_oracle_max)
+
+    # TODO: Remove; prints the sequence sampled/generated in current iter
+    if t > 0:
+        for seq in Xt.numpy():
+            print("".join(tokenizer.decode(seq)))
 
     # Train VAE model
     if t == 0:
@@ -193,22 +211,26 @@ for t in range(20):
 
         # Create dataset
         data_loader = DataLoader(
-            dataset=Xt_onehot,
-            batch_size=32, # NOTE: In its current implementation, this has to be the same as weights. It can't be less
+            dataset=TensorDataset(Xt_onehot, weights),
+            batch_size=32,
             num_workers=mp.cpu_count(),
             pin_memory=torch.cuda.is_available(),
         )
 
         # Initialize optimizer; TODO: Restart or continue from previous? This is
-        # important because of weight decay.
+        # important because of weight decay part of AdamW.
         optimizer = optim.AdamW(vae.parameters(), lr=1e-3)
 
         # Restart training with new samples
-        step = 0 # TODO: Restart or continue from previous??
+        # NOTE: Do we restart or continue from the previous run of the VAE? This
+        # primarily affects the weight of the KL-divergence term
+        step = 0
+        vae.train()
         for epoch in range(10): # TODO: it_epochs=10, can be changed
             for it, batch in enumerate(data_loader):
-                onehot = batch.to(device)
+                onehot = batch[0].to(device)
                 target = torch.argmax(onehot, dim=-1) # seqs
+                batch_weights = batch[1].to(device).view(-1, 1)
                 # Forward pass
                 pred, mu, logvar, z = vae(onehot)
                 # Loss calculation
@@ -217,8 +239,9 @@ for t in range(20):
                     x0=2500, reduction="none")
                 # Reweight nll_loss w/ sample weights
                 # NOTE: Should we normalize sample weights: https://discuss.pytorch.org/t/25530/4?
-                nll_loss = (nll_loss * weights.view(-1, 1)).sum()
+                nll_loss = (nll_loss * batch_weights).sum()
                 loss = (nll_loss + kl_weight * kl_loss) / batch_size
+                print(loss.item(), nll_loss.item(), kl_weight, kl_loss.item())
                 # Compute gradients and update params/weights
                 optimizer.zero_grad()
                 loss.backward()
@@ -232,15 +255,16 @@ for t in range(20):
 # TODO: Figure out reweighting scheme properly when retraining.... do we
 # normalize the weights or keep them unchanged?
 # TODO: Are the sample weights being calculated correctly?
-# TODO: Try sampling the sequences rather than selecting those with the highest
-# probability of being generated from the latent distribution. THIS could be the
-# key as the model elarns to explore the space properly.... alternatively we
-# could keep a track of all the sequences processed in previous iterations and
+# TODO: Keep track of all the sequences processed in previous iterations and
 # select only those that have not been looked at previously...
 # TODO: How is the latent space changing...
 
-# TODO: Try using oracle that is given in CbAS (just densely
-# connected)...although according to their paper this doesn't matter that much
-# since they assume the oracle is not that good. 
+# Maybe the best way to understand what is happening is to run through the GFP
+# data used in CbAS on this model, does it actually follow their experiments?
 # TODO: Try this whole method on CbAS data? Could the issue be with the actual
 # dataset? It is quite possible...
+
+# TODO: Try using oracle that is given in CbAS (just densely
+# connected)...although according to their paper this shouldn't matter since
+# they assume the oracle is not a good predictor.
+# TODO: Save top k sequences, rather than just top 1.
