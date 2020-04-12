@@ -10,10 +10,13 @@ from torch.nn import functional as F
 # Anneal KL-divergence term, see: https://arxiv.org/abs/1511.06349
 def _kl_anneal_function(anneal_function: str, step: int, k: float = 0.0025,
                         x0: int = 2500) -> float:
-    if anneal_function == "logistic":
+    if anneal_function is None:
+        return 1.
+    elif anneal_function == "logistic":
         return float(1/(1+math.exp(-k*(step-x0))))
     elif anneal_function == "linear":
         return min(1, step/x0)
+    raise ValueError(f"Invalid annealing function {anneal_function}.")
 
 
 def elbo_loss(pred: torch.Tensor, target: torch.Tensor, mu: torch.Tensor,
@@ -86,16 +89,13 @@ def gaussian_nll_loss(pred: torch.Tensor, target: torch.Tensor,
     [2] http://willwolf.io/2017/05/18/minimizing_the_negative_log_likelihood_in_english/
     [3] https://stats.stackexchange.com/q/311331
     """
-    N = pred.size(0)
-    if N != target.size(0):
-        raise ValueError(f"Sizes do not match ({N} != {target.size(0)}).")
-    mu = pred[:, 0]
-    # To ensure positive variance, we apply a softplus and add 1e-6
-    var = F.softplus(pred[:, 1]) + 1e-6
+    n_samples = pred.size(0)
+    if n_samples != target.size(0):
+        raise ValueError(f"Sizes do not match ({n_samples} != {target.size(0)}).")
+    mean = pred[:, 0]
+    var = F.softplus(pred[:, 1]) + 1e-6 # positivity constraint
     logvar = torch.log(var)
     target = target.squeeze(1)
-    if reduction == "mean":
-        return 0.5 * torch.log(torch.Tensor([math.tau])) + 0.5 * torch.mean(logvar) \
-            + 0.5 * torch.mean(torch.square(target - mu) / var)
-    return 0.5 * N * torch.log(torch.Tensor([math.tau])) + 0.5 * torch.sum(logvar) \
-        + torch.sum(torch.square(target - mu) / (2 * var))
+    loss = 0.5 * n_samples * torch.log(torch.Tensor([math.tau])) \
+        + 0.5 * torch.sum(logvar) + torch.sum(torch.square(target - mean) / (2 * var))
+    return loss / n_samples if reduction == "mean" else loss
