@@ -10,11 +10,11 @@ from torch import optim
 from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 
 from profit.dataset.splitters import split_method_dict
-from profit.models.pytorch.lstm import LSTMModel
+from profit.models.torch.lstm import LSTMModel
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
-from profit.utils.training_utils.pytorch.callbacks import EarlyStopping
-from profit.utils.training_utils.pytorch.callbacks import ModelCheckpoint
-from profit.utils.training_utils.pytorch import losses as L
+from profit.utils.training_utils.torch.callbacks import EarlyStopping
+from profit.utils.training_utils.torch.callbacks import ModelCheckpoint
+from profit.utils.training_utils.torch import losses as L
 
 from data import load_dataset
 
