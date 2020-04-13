@@ -2,6 +2,7 @@ from profit.utils.data_utils import cacher
 from profit.utils.data_utils import cast
 from profit.utils.data_utils import datasets
 from profit.utils.data_utils import example_pb2
+from profit.utils.data_utils import peptides
 from profit.utils.data_utils import serializers
 from profit.utils.data_utils import substitution_matrices
 from profit.utils.data_utils import tfreader
@@ -20,6 +21,8 @@ from profit.utils.data_utils.datasets import TorchHDF5Dataset
 from profit.utils.data_utils.datasets import TorchLMDBDataset
 from profit.utils.data_utils.datasets import TorchNumpyDataset
 from profit.utils.data_utils.datasets import TorchTFRecordsDataset
+
+from profit.utils.data_utils.peptides import *
 
 from profit.utils.data_utils.serializers import HDF5Serializer
 from profit.utils.data_utils.serializers import LMDBSerializer
