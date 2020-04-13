@@ -59,10 +59,10 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 
 from profit.dataset.splitters import split_method_dict
-from profit.models.pytorch.vae import SequenceVAE
+from profit.models.torch.vae import SequenceVAE
 from profit.utils.data_utils import VOCABS
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
-from profit.utils.training_utils.pytorch import losses as L
+from profit.utils.training_utils.torch import losses as L
 
 from data import load_dataset
 

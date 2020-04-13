@@ -1,7 +1,7 @@
 """Different vocab types."""
 
 from collections import OrderedDict
-from profit.peptide_builder.polypeptides import aa1, aa3
+from profit.utils.data_utils.peptides import aa1, aa3
 
 
 # See: https://www.dnastar.com/megalign_help/index.html#!Documents/iupaccodesforaminoacids.htm

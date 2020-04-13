@@ -1,4 +1,5 @@
-"""Polypetide representation(s) and conversion(s)."""
+"""Amino acid name(s) and conversion(s)."""
+
 
 aa1 = list("ARNDCQEGHILKMFPSTWYV")
 aa3 = ["ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS",

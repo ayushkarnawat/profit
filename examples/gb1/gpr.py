@@ -64,8 +64,8 @@ train_only = df.loc[df["is_train"] == 1]
 val_only = df.loc[df["is_train"] == 0]
 
 # Determine how well the regressor fit to the dataset
-rmse = np.sqrt(np.mean(np.square((val_only["pred"] - val_only["true"])))) * 1.0
-print(f"RMSE: {rmse}")
+mse = np.mean(np.square((val_only["pred"] - val_only["true"])))
+print(f"MSE: {mse}")
 
 # Plot observations, prediction and 95% confidence interval (2\sigma).
 # NOTE: We plot the whole sequence to avoid erratic line jumps

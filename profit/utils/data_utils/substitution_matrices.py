@@ -13,7 +13,7 @@ work well [3].
 Regardless of the scoring scheme used, each element in the matrix
 denotes the substitution probabilty between the 20 naturally occuring
 amino acids [4]. Note that the rows and columns are both indexed by the
-order denoted in :class:`peptide_builder.polypedetides.aa1`.
+order denoted in :class:`utils.data_utils.peptides.aa1`.
 
 TODO: Change ordering to be based off the order defined in aa1? As of
 now, the ordering is correct, but if the underlying vocab ordering
