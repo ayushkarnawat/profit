@@ -77,16 +77,19 @@ def gaussian_nll_loss(pred: torch.Tensor, target: torch.Tensor,
     target: torch.Tensor, size=(N)
         Ground truth (mean) value.
 
-    reduction: str, default="mean"
+    reduction: str, default="sum"
         Specifies the reduction to apply to the output. If "mean", the
         sum of the output will be divided by the number of elements in
-        the output. If "sum", the output will be summed.
+        the output. If "sum", the output will be summed. If "none", then
+        no reduction will be applied.
 
     References:
     -----------
     [1] D. A. Nix and A. S. Weigend. Estimating the mean and variance of
         the target probability distribution. In Neural Networks, 1994.
+
     [2] http://willwolf.io/2017/05/18/minimizing_the_negative_log_likelihood_in_english/
+
     [3] https://stats.stackexchange.com/q/311331
     """
     n_samples = pred.size(0)
@@ -94,8 +97,10 @@ def gaussian_nll_loss(pred: torch.Tensor, target: torch.Tensor,
         raise ValueError(f"Sizes do not match ({n_samples} != {target.size(0)}).")
     mean = pred[:, 0]
     var = F.softplus(pred[:, 1]) + 1e-6 # positivity constraint
-    logvar = torch.log(var)
     target = target.squeeze(1)
-    loss = 0.5 * n_samples * torch.log(torch.Tensor([math.tau])) \
-        + 0.5 * torch.sum(logvar) + torch.sum(torch.square(target - mean) / (2 * var))
-    return loss / n_samples if reduction == "mean" else loss
+    loss = 0.5 * torch.log(math.tau * var) + ((target - mean)**2 / (2 * var))
+    if reduction == "sum":
+        return torch.sum(loss)
+    if reduction == "mean":
+        return torch.mean(loss)
+    return loss
