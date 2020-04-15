@@ -7,27 +7,31 @@ import matplotlib.pyplot as plt
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 
+import torch
+from torch.utils.data import Subset
+
 from profit.dataset.splitters import split_method_dict
+from profit.models.torch.gpr import SequenceGPR
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
 
 from data import load_dataset
-from seq_gp import SequenceGPR
 
 
 # Preprocess + load the dataset
 dataset = load_dataset("lstm", "primary", labels="Fitness", num_data=-1,
-                       filetype="mdb", as_numpy=True, vocab="aa20")
-# dataset = [arr[-10:] for arr in dataset]
+                       filetype="mdb", as_numpy=False, vocab="aa20")
+_dataset = dataset[:]["arr_0"]
+_labels = dataset[:]["arr_1"].view(-1)
 
 # Shuffle, split, and batch
 splits = ["train", "valid"]
-subset_idx = split_method_dict["stratified"]().train_valid_split(dataset[0], \
-    dataset[-1].flatten(), frac_train=0.8, frac_val=0.2, n_bins=10, return_idxs=True)
-stratified = {split: [arr[idx] for arr in dataset]
+subset_idx = split_method_dict["stratified"]().train_valid_split(_dataset, \
+    _labels.tolist(), frac_train=0.8, frac_val=0.2, n_bins=10, return_idxs=True)
+stratified = {split: Subset(dataset, sorted(idx))
               for split, idx in zip(splits, subset_idx)}
 
-train_X, train_y = stratified["train"]
-val_X, val_y = stratified["valid"]
+train_X, train_y = stratified["train"][:].values()
+val_X, val_y = stratified["valid"][:].values()
 
 # Instantiate a Gaussian Process model
 use_substitution = True
@@ -41,19 +45,23 @@ else:
 gp.fit(train_X, train_y)
 
 # Make prediction (mu) on whole sample space (ask for std as well)
-y_pred, sigma = gp.predict(dataset[0], return_std=True)
+y_pred, sigma = gp.predict(_dataset, return_std=True)
+if isinstance(y_pred, torch.Tensor):
+    y_pred = y_pred.numpy()
+if isinstance(sigma, torch.Tensor):
+    sigma = sigma.numpy()
 
 tokenizer = AminoAcidTokenizer("aa20")
 seqs_4char = []
-for encoded_seq in dataset[0]:
+for encoded_seq in _dataset.numpy():
     seq = tokenizer.decode(encoded_seq)
     seqs_4char.append(seq[38] + seq[39] + seq[40] + seq[53])
 df = pd.DataFrame(columns=["seq", "true", "pred", "sigma"])
 df["seq"] = seqs_4char
-df["true"] = dataset[-1]
+df["true"] = _labels.numpy()
 df["pred"] = y_pred
 df["sigma"] = sigma
-df["is_train"] = [1 if idx in subset_idx[0] else 0 for idx in range(dataset[0].shape[0])]
+df["is_train"] = [1 if idx in subset_idx[0] else 0 for idx in range(len(dataset))]
 
 # If x-axis is seq, sort df by seq (in alphabetical order) for "better"
 # visualization. If plotting via index, no need for resorting.
