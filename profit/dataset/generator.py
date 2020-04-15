@@ -65,14 +65,23 @@ if __name__ == "__main__":
     from tqdm import tqdm
     from profit.dataset.preprocessors.lstm_preprocessor import LSTMPreprocessor
     from profit.utils.data_utils.serializers import LMDBSerializer
+    from profit.utils.data_utils.cacher import CacheNamePolicy
 
     # Generate (all) variants
-    seqs = gen(n=4)
-    pos = [39, 40, 41, 54]
     template = list("MTYKLILNGKTLKGETTTEAVDAATAEKVFKQYANDNGVDGEWTYDDATKTFTVTE")
+    pos = [39, 40, 41, 54]
+    num_mutation_sites = len(pos)
+    seqs = gen(n=num_mutation_sites)
+
+    # Only select 5000 random sequences
+    random_state = 1
+    np.random.seed(random_state)
+    idx = np.random.choice(np.arange(len(seqs)), size=5000, replace=False)
+    seqs = seqs[idx]
 
     # Compute features
-    pp = LSTMPreprocessor(vocab="iupac1")
+    vocab = "aa20"
+    pp = LSTMPreprocessor(vocab=vocab)
     features = []
     for seq in tqdm(seqs, total=len(seqs)):
         assert len(seq) == len(pos)
@@ -82,8 +91,10 @@ if __name__ == "__main__":
     features = np.array(features)
 
     # Save dataset
-    LMDBSerializer.save(features, path="data/3gb1/processed/lstm_fitness/variants.mdb")
-
-    # Compute features (aka embeddings) for those cases
-    # generate('data/raw/variants{}.csv'.format(20**n), n=n)
-    
+    num_data = len(seqs) if len(seqs) < 20**num_mutation_sites else -1
+    policy = CacheNamePolicy(method="lstm", mutator="variants", labels="Fitness",
+                             rootdir="data/3gb1/processed", num_data=num_data,
+                             filetype="mdb", vocab=vocab)
+    data_path = policy.get_data_file_path()
+    policy.create_cache_directory()
+    LMDBSerializer.save(data=features, path=data_path)
