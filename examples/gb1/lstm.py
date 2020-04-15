@@ -1,5 +1,7 @@
 """Train GB1 LSTM oracle."""
 
+import os
+import time
 import multiprocessing as mp
 import pandas as pd
 
@@ -8,15 +10,16 @@ from torch import optim
 from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 
 from profit.dataset.splitters import split_method_dict
-from profit.models.pytorch.lstm import LSTMModel
+from profit.models.torch.lstm import LSTMModel
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
-from profit.utils.training_utils.pytorch.callbacks import EarlyStopping
-from profit.utils.training_utils.pytorch.callbacks import ModelCheckpoint
-from profit.utils.training_utils.pytorch import losses as L
+from profit.utils.training_utils.torch.callbacks import EarlyStopping
+from profit.utils.training_utils.torch.callbacks import ModelCheckpoint
+from profit.utils.training_utils.torch import losses as L
 
 from data import load_dataset
 
 
+timestep = time.strftime("%Y-%b-%d-%H:%M:%S", time.gmtime())
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
 splits = ["train", "valid"]
@@ -64,15 +67,17 @@ model = LSTMModel(vocab_size, input_size=64, hidden_size=128, num_layers=2,
 # Init callbacks
 # NOTE: Must set model (within save_clbk) to ensure weights get saved
 stop_clbk = EarlyStopping(patience=5, verbose=1)
-save_clbk = ModelCheckpoint("bin/3gb1/lstm", monitor="val_loss", verbose=1,
-                            save_weights_only=False, prefix="")
+save_clbk = ModelCheckpoint(os.path.join("bin/3gb1/lstm", timestep),
+                            monitor="val_loss",
+                            verbose=1,
+                            save_weights_only=True)
 save_clbk.set_model(model)
 
 # Init callbacks
 optimizer = optim.AdamW(model.parameters(), lr=1e-3)
 
 step = 0
-epochs = 15
+epochs = 50
 for epoch in range(1, epochs+1):
     for split in splits:
         summed_loss = 0
@@ -106,7 +111,7 @@ for epoch in range(1, epochs+1):
                 step += 1
 
             # Bookkeeping (batch)
-            if it % 2 == 0 or it+1 == len(data_loader):
+            if it % 5 == 0 or it+1 == len(data_loader):
                 print("{} Batch {:04d}/{:d} ({:.2f}%)\tLoss: {:.4f}".format(
                     split.upper(), it+1, len(data_loader),
                     100. * ((it+1)/len(data_loader)), loss.item()))

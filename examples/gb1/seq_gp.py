@@ -75,8 +75,8 @@ class SequenceGPR:
         self.gamma = gamma
 
         # Computed during training
-        self.X_ = None
-        self.y_ = None
+        self.x_train = None
+        self.y_train = None
         self.k_ = None
         self.kinv_ = None
 
@@ -97,7 +97,7 @@ class SequenceGPR:
     #     return np.exp(self.gamma*k)
 
 
-    def fit(self, x_train: np.ndarray, y_train: np.ndarray):
+    def fit(self, x_train: np.ndarray, y_train: np.ndarray) -> None:
         r"""Compute the covariance kernel.
 
         Params:
@@ -110,8 +110,8 @@ class SequenceGPR:
         """
         # Convert values to ints, if necessary
         if x_train.dtype.kind != "i":
-            warnings.warn("Values in x_train were of type "
-                          f"`{str(x_train.dtype)}`; converting to ints.")
+            warnings.warn(f"Values in x_train of type `{str(x_train.dtype)}`. "
+                          "Converting to ints.")
             x_train = x_train.astype(np.int)
 
         # Check if each value is 0 <= x_train[i] < len(smatrix). This is because
@@ -121,29 +121,28 @@ class SequenceGPR:
                              f"{self.smatrix.shape[0]}).")
 
         # Save params for prediction
-        self.X_ = x_train
-        self.y_ = y_train
+        self.x_train = x_train
+        self.y_train = y_train
 
         # Repeat x1 along dim=1 (similarly x2 along dim=0) so that we can
-        # compute covariance between x_star and x_train (denoted X_{ij})
+        # compute covariance between all permutations of x_train
         N = x_train.shape[0]
-        x1 = np.tile(np.transpose(np.expand_dims(x_train, axis=0),
+        xi = np.tile(np.transpose(np.expand_dims(x_train, axis=0),
                                   axes=(1, 0, 2)), reps=(1, N, 1))
-        x2 = np.tile(np.expand_dims(x_train, axis=0), reps=(N, 1, 1))
+        xj = np.tile(np.expand_dims(x_train, axis=0), reps=(N, 1, 1))
 
-        # Compute covariance kernel k_{BLOSUM}(x,y)
+        # Compute covariance kernel k(x_i, x_j)
         # Retrieve substitution prob (between AAs at same position
         # between 2 sequences) across all amino acids.
-        kij = np.prod(self.smatrix[(x1, x2)]**self.beta, axis=-1)
-        kii = np.prod(self.smatrix[(x1, x1)]**self.beta, axis=-1)
-        kjj = np.prod(self.smatrix[(x2, x2)]**self.beta, axis=-1)
+        kij = np.prod(self.smatrix[(xi, xj)]**self.beta, axis=-1)
+        kii = np.prod(self.smatrix[(xi, xi)]**self.beta, axis=-1)
+        kjj = np.prod(self.smatrix[(xj, xj)]**self.beta, axis=-1)
         k = kij / (np.sqrt(kii*kjj))            # normalize kernel
         noise = self.alpha * np.eye(k.shape[0]) # noise along diag
         self.k_ = np.exp(self.gamma*k) + noise
 
-        # Invert covariance kernel K; needed for prediction
+        # Invert covariance kernel k; needed for prediction
         self.kinv_ = np.linalg.inv(self.k_)
-        return self
 
 
     def predict(self, x_star: np.ndarray,
@@ -164,34 +163,34 @@ class SequenceGPR:
             If True, returns the std (uncertainty) of the prediction.
         """
         # Check if the sequence lengths match
-        if x_star.shape[-1] != self.X_.shape[-1]:
+        if x_star.shape[-1] != self.x_train.shape[-1]:
             raise ValueError(f"Sequence lengths do not match ({x_star.shape[-1]}"
-                             f"!= {self.X_.shape[-1]}).")
+                             f"!= {self.x_train.shape[-1]}).")
 
         # Convert values to ints, if necessary
         if x_star.dtype.kind != "i":
-            warnings.warn("Values in x_train were of type "
-                          f"`{str(x_star.dtype)}`; converting to ints.")
+            warnings.warn(f"Values in x_star of type `{str(x_star.dtype)}`. "
+                          "Converting to ints.")
             x_star = x_star.astype(np.int)
 
         # Check if each value is 0 <= x_star[i] < len(smatrix). This is because
         # x_star represents indicies of the vocab (i.e. amino acids).
         if not np.all(x_star >= 0) and np.all(x_star < self.smatrix.shape[0]):
-            raise ValueError("Check input x_train - all value should be [0, "
+            raise ValueError("Check input x_star - all value should be [0, "
                              f"{self.smatrix.shape[0]}).")
 
         # Repeat x1 along dim=1 (similarly x2 along dim=0) so that we can
-        # compute covariance between x_star and x_train (denoted X_{ij})
+        # compute covariance between x_star and x_train
         M = x_star.shape[0]
-        N = self.X_.shape[0]
-        x1 = np.tile(np.transpose(np.expand_dims(x_star, axis=0),
-                                  axes=(1, 0, 2)), reps=(1, N, 1))
-        x2 = np.tile(np.expand_dims(self.X_, axis=0), reps=(M, 1, 1))
+        N = self.x_train.shape[0]
+        x_star = np.tile(np.transpose(np.expand_dims(
+            x_star, axis=0), axes=(1, 0, 2)), reps=(1, N, 1))
+        x_train = np.tile(np.expand_dims(self.x_train, axis=0), reps=(M, 1, 1))
 
-        # Compute kernel k_{BLOSUM}(x*, x_train)
-        kij = np.prod(self.smatrix[(x1, x2)]**self.beta, axis=-1)
-        kii = np.prod(self.smatrix[(x1, x1)]**self.beta, axis=-1)
-        kjj = np.prod(self.smatrix[(x2, x2)]**self.beta, axis=-1)
+        # Compute kernel k(x_star, x_train)
+        kij = np.prod(self.smatrix[(x_star, x_train)]**self.beta, axis=-1)
+        kii = np.prod(self.smatrix[(x_star, x_star)]**self.beta, axis=-1)
+        kjj = np.prod(self.smatrix[(x_train, x_train)]**self.beta, axis=-1)
         k = kij / (np.sqrt(kii*kjj)) # normalize kernel
         k_star = np.exp(self.gamma*k)
 
@@ -202,9 +201,9 @@ class SequenceGPR:
         # k_star = np.zeros((M, N))
         # for i in range(M):
         #     for j in range(N):
-        #         kij = self._kernel(x_star[i], self.X_[j])
+        #         kij = self._kernel(x_star[i], self.x_train[j])
         #         k_star[i, j] = kij
-        y_mean = np.matmul(k_star, np.matmul(self.kinv_, self.y_))
+        y_mean = np.matmul(k_star, np.matmul(self.kinv_, self.y_train))
         if return_std:
             # Since K(x*,x*)=1, the variance will be e^(gamma*1.)
             y_var = np.repeat(np.exp(self.gamma*1.), M)

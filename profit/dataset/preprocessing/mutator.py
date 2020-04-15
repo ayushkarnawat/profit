@@ -10,7 +10,8 @@ import pymol
 from pymol import __main__, cmd
 from pymol.wizard.mutagenesis import Mutagenesis
 
-from profit.peptide_builder.polypeptides import aa1, aa3, three_to_one, one_to_three, is_aa
+from profit.utils.data_utils.peptides import (aa1, aa3, three_to_one,
+                                              one_to_three, is_aa)
 from profit.utils.io_utils import maybe_create_dir, DownloadError
 
 

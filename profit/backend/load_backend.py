@@ -1,23 +1,21 @@
-"""
-Setup the default profit backend. Allows choice of using pytorch or 
-keras/tensorflow models. Additionally, specifies how the data is 
+"""Setup the default profit backend. Allows choice of using pytorch or
+keras/tensorflow models. Additionally, specifies how the data is
 formatted (for generic lazy loading and batching examples).
 
-NOTE: We do not have a `set_backend()` function as, if the user decides 
-to change the backend in the middle of the script/program, that would 
-mess up the computation. To prevent such an occurence, it is RECOMMENED 
-that the user modify the `backend` key within the `~/.profit.profit.json` 
-file. This will (re)load the specified backend before any computations 
-have been performed.
+NOTE: We do not have a `set_backend()` function as, if the user decides
+to change the backend in the middle of the script/program, that would
+mess up the computation. To prevent such an occurence, it is RECOMMENED
+that the user modify the `backend` key within `~/.profit.profit.json`.
+This will (re)load the specified backend before any computations have
+been performed.
 
-Adapted from the keras backend: https://git.io/JvqPB
+Adapted from the keras backend: https://git.io/JvqPB.
 """
 
 from __future__ import absolute_import
 from __future__ import print_function
 
 import os
-import sys
 import json
 
 from profit.backend.common import data_format
@@ -34,8 +32,8 @@ else:
         _profit_base_dir = '/tmp'
     _profit_dir = os.path.join(_profit_base_dir, '.profit')
 
-# Default backend: PyTorch.
-_BACKEND = 'pytorch'
+# Default backend: Torch.
+_BACKEND = 'torch'
 
 # Attempt to read profit config file.
 _config_path = os.path.expanduser(os.path.join(_profit_dir, 'profit.json'))
@@ -46,7 +44,7 @@ if os.path.exists(_config_path):
     except ValueError:
         _config = {}
     _backend = _config.get('backend', _BACKEND)
-    assert _backend in {'pytorch', 'tensorflow'}
+    assert _backend in {'torch', 'tensorflow'}
     _data_format = _config.get('data_format', data_format())
     assert _data_format in {'batch_last', 'batch_first'}
 
@@ -83,8 +81,8 @@ if 'PROFIT_BACKEND' in os.environ:
 
 
 def backend() -> str:
-    """Returns the name of the current backend (e.g. "pytorch").
-    
+    """Returns the name of the current backend (e.g. "torch").
+
     Returns:
     --------
     backend: str
@@ -94,7 +92,7 @@ def backend() -> str:
     --------
     ```python
     >>> profit.backend.backend()
-    'pytorch'
+    'torch'
     ```
     """
     return _BACKEND

@@ -169,7 +169,7 @@ class HDF5Serializer(InMemorySerializer):
                 data = [np.moveaxis(arr[:], saved_axis, out_axis)
                         for arr in h5file.values()]
             return data[0] if len(data) == 1 else data
-        return TorchHDF5Dataset(path) if P.backend() == "pytorch" \
+        return TorchHDF5Dataset(path) if P.backend() == "torch" \
             else TensorflowHDF5Dataset(path)
 
 
@@ -305,7 +305,7 @@ class LMDBSerializer(LazySerializer):
                 data = [np.moveaxis(pkl.loads(cursor.get(key)), saved_axis, out_axis)
                         for key in pkl.loads(cursor.get(b"__keys__"))]
             return data[0] if len(data) == 1 else data
-        return TorchLMDBDataset(path) if P.backend() == "pytorch" \
+        return TorchLMDBDataset(path) if P.backend() == "torch" \
             else TensorflowLMDBDataset(path)
 
 
@@ -382,7 +382,7 @@ class NumpySerializer(InMemorySerializer):
                 data = [np.moveaxis(npzfile[key], saved_axis, out_axis)
                         for key in npzfile["__keys__"]]
             return data[0] if len(data) == 1 else data
-        return TorchNumpyDataset(path) if P.backend() == "pytorch" \
+        return TorchNumpyDataset(path) if P.backend() == "torch" \
             else TensorflowNumpyDataset(path)
 
 
@@ -569,6 +569,5 @@ class TFRecordsSerializer(LazySerializer):
             # Extract np.ndarray's from dict and return in its original form
             data = dataset_dict.values()
             return data[0] if len(data) == 1 else data
-        return TorchTFRecordsDataset(path) if P.backend() == "pytorch" \
+        return TorchTFRecordsDataset(path) if P.backend() == "torch" \
             else TFRecordsDataset(path)
-        

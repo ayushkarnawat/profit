@@ -41,28 +41,30 @@ def elbo_loss(pred: torch.Tensor, target: torch.Tensor, mu: torch.Tensor,
 
 def gaussian_nll_loss(pred: torch.Tensor, target: torch.Tensor,
                       reduction: str = "sum") -> torch.Tensor:
-    """Compute negative log-likelihood (NLL) loss of a `N(\\mu,\\sigma^2)`
-    gaussian distribution.
+    r"""Compute negative log-likelihood (NLL) loss of a :math:
+    `\mathcal{N}(\mu, \sigma^2)` gaussian distribution.
 
     Usually, for regression-based tasks, neural networks often output a
-    single value, `\\mu(x)`, and the parameters `\\theta` are optimized
-    to minimize the mean-squared error (MSE) loss. This is because, we
-    want to give more weight to the larger differences (aka outliers).
+    single value, :math:`\mu(x)`, and the parameters :math:`\theta`
+    are optimized to minimize the mean-squared error (MSE) loss. This is
+    because, we want to give more weight to the larger differences (aka
+    outliers).
 
     However, the MSE does not capture the uncertainty in the prediction.
     Instead, we use a network that outputs two values, corresponding to
-    the mean `\\mu(x)` and variance `\\sigma^2(x) > 0`, respectively [1].
-    By treating the observed value `y \\in \\mathcal{N}(\\mu, \\sigma^2)`
-    as a sample from a Gaussian distribution with the predicted mean and
-    variance, we can minimize the likelihood function `p(y|x, \\theta)`,
-    which represents the loss across all parameters `\\theta`. It can be
-    easily shown that minimizing the NLL of our data with respect to
-    `\\theta` is equivalent to minimizing the MSE between the observed
-    `y` and our prediction [2, 3]. That is, `\\argmin(NLL) = \\argmin(MLE)`.
+    the mean :math:`\mu(x)` and variance :math:`\sigma^2(x) > 0` [1].
+    By treating the observed value :math:`y \in \mathcal{N}(\mu,
+    \sigma^2)` as a sample from a Gaussian distribution with the
+    predicted mean and variance, we can minimize the likelihood function
+    :math:`p(y|x, \theta)`, which represents the loss across all params
+    :math:`\theta`. It can be easily shown that minimizing the NLL of
+    our data with respect to :math:`\theta` is equivalent to minimizing
+    the MSE between the observed :math:`y` and our prediction [2, 3].
+    That is, :math:`\argmin(\text{NLL}) = \argmin(\text{MLE})`.
 
     NOTE: To ensure the positivity constraint on the variance, we pass
-    the input through a softplus function `\\log (1+\\exp{(\\cdot)})`
-    and add a minimum variance of `10^-6` for numerical stability.
+    the input through a softplus function :math:`\log (1+\exp{(\cdot)})`
+    and add a minimum variance of :math:`10^-6` for numerical stability.
 
     Params:
     -------
@@ -93,7 +95,7 @@ def gaussian_nll_loss(pred: torch.Tensor, target: torch.Tensor,
     logvar = torch.log(var)
     target = target.squeeze(1)
     if reduction == "mean":
-        return 0.5 * torch.log(torch.tensor([math.tau])) + 0.5 * torch.mean(logvar) \
+        return 0.5 * torch.log(torch.Tensor([math.tau])) + 0.5 * torch.mean(logvar) \
             + 0.5 * torch.mean(torch.square(target - mu) / var)
-    return 0.5 * N * torch.log(torch.tensor([math.tau])) + 0.5 * torch.sum(logvar) \
+    return 0.5 * N * torch.log(torch.Tensor([math.tau])) + 0.5 * torch.sum(logvar) \
         + torch.sum(torch.square(target - mu) / (2 * var))
