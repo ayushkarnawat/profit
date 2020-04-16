@@ -10,7 +10,7 @@ from torch import optim
 from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 
 from profit.dataset.splitters import split_method_dict
-from profit.models.torch.lstm import LSTMModel
+from profit.models.torch.lstm import SequenceLSTM
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
 from profit.utils.training_utils.torch.callbacks import EarlyStopping
 from profit.utils.training_utils.torch.callbacks import ModelCheckpoint
@@ -61,7 +61,7 @@ sampler = stratified_sampler(stratified["train"][:]["arr_1"].view(-1))
 
 # Init model
 vocab_size = AminoAcidTokenizer("aa20").vocab_size
-model = LSTMModel(vocab_size, input_size=64, hidden_size=128, num_layers=2,
+model = SequenceLSTM(vocab_size, input_size=64, hidden_size=128, num_layers=2,
                   num_outputs=2, hidden_dropout=0.25)
 
 # Init callbacks
