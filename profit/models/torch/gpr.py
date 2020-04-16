@@ -130,10 +130,10 @@ class SequenceGPR:
                              f"{y_train.ndim} instead.")
         if x_train.ndim < 2:
             warnings.warn("x_train.ndim < 2. Expanding across first dim.")
-            x_train = x_train.unsqueeze(0)
+            x_train = x_train.unsqueeze(0) # row vector
         if y_train.ndim < 2:
-            warnings.warn("y_train.ndim < 2. Expanding across first dim.")
-            y_train = y_train.unsqueeze(0)
+            warnings.warn("y_train.ndim < 2. Expanding across second dim.")
+            y_train = y_train.unsqueeze(1) # column vector
 
         # Save params for prediction
         self.x_train = x_train
