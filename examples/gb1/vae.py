@@ -36,10 +36,17 @@ to the true variational lower bound [4].
 
 References:
 -----------
--[1] VAE paper: https://arxiv.org/abs/1312.6114
--[2] CbAS paper: https://arxiv.org/abs/1901.10060
--[3] Balancing VAE loss: https://stats.stackexchange.com/q/341954
--[4] Sentence-VAE paper: https://arxiv.org/abs/1511.06349
+[1] Kingma, Diederik P., and Max Welling. "Auto-encoding variational
+    bayes." arXiv preprint arXiv:1312.6114 (2013).
+
+[2] Brookes, David H., Hahnbeom Park, and Jennifer Listgarten.
+    "Conditioning by adaptive sampling for robust design." arXiv
+    preprint arXiv:1901.10060 (2019).
+
+[3] Balancing VAE loss: https://stats.stackexchange.com/q/341954
+
+[4] Bowman, Samuel R., et al. "Generating sentences from a continuous
+    space." arXiv preprint arXiv:1511.06349 (2015).
 """
 
 import os
@@ -50,13 +57,11 @@ import argparse
 from collections import defaultdict
 from multiprocessing import cpu_count
 
-import pandas as pd
-from tensorboardX import SummaryWriter
-
 import torch
 from torch import optim
 from torch.nn import functional as F
-from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
+from torch.utils.data import DataLoader, Subset
+from tensorboardX import SummaryWriter
 
 from profit.dataset.splitters import split_method_dict
 from profit.models.torch.vae import SequenceVAE
@@ -64,7 +69,7 @@ from profit.utils.data_utils import VOCABS
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
 from profit.utils.training_utils.torch import losses as L
 
-from data import load_dataset
+from data import load_variants
 
 
 def main(args):
@@ -77,38 +82,16 @@ def main(args):
     splits += ["test"] if args.test_size > 0 else []
 
     # Preprocess + load the dataset
-    dataset = load_dataset("lstm", "primary", labels="Fitness", num_data=-1,
-                           filetype="mdb", as_numpy=False, vocab=args.vocab)
+    dataset = load_variants("lstm", labels="Fitness", num_data=5000,
+                            filetype="mdb", as_numpy=False, vocab=args.vocab)
 
-    # Stratify train/val/test sets such that the target labels are equally
-    # represented in each subset. Each subset will have the same ratio of
-    # low/mid/high variants in each batch as the full dataset.
-    # See: https://discuss.pytorch.org/t/29907/2
+    # Split train/val/test sets randomly
     _dataset = dataset[:]["arr_0"]
-    _labels = dataset[:]["arr_1"].view(-1)
-    # Create subset indicies
-    subset_idx = split_method_dict["stratified"]().train_valid_test_split(
-        dataset=_dataset, labels=_labels.tolist(), frac_train=args.train_size,
-        frac_val=args.valid_size, frac_test=args.test_size, return_idxs=True,
-        n_bins=5)
+    subset_idx = split_method_dict["random"]().train_valid_test_split(
+        dataset=_dataset, frac_train=args.train_size, frac_valid=args.valid_size,
+        frac_test=args.test_size, return_idxs=True)
     stratified = {split: Subset(dataset, sorted(idx))
                   for split, idx in zip(splits, subset_idx)}
-
-    # Compute sample weight (each sample should get its own weight)
-    def stratified_sampler(labels: torch.Tensor,
-                           nbins: int = 10) -> WeightedRandomSampler:
-        bin_labels = torch.tensor(pd.qcut(labels.tolist(), q=nbins,
-                                          labels=False, duplicates="drop"))
-        class_sample_count = torch.tensor(
-            [(bin_labels == t).sum() for t in torch.unique(bin_labels, sorted=True)])
-        weight = 1. / class_sample_count.float()
-        samples_weight = torch.zeros_like(labels)
-        for t in torch.unique(bin_labels):
-            samples_weight[bin_labels == t] = weight[t]
-        return WeightedRandomSampler(samples_weight, len(samples_weight))
-
-    # Create sampler (only needed for train)
-    sampler = stratified_sampler(stratified["train"][:]["arr_1"].view(-1))
 
     # Initialize model
     tokenizer = AminoAcidTokenizer(args.vocab)
@@ -146,7 +129,7 @@ def main(args):
             data_loader = DataLoader(
                 dataset=stratified[split],
                 batch_size=args.batch_size,
-                sampler=sampler if split == "train" else None,
+                shuffle=split == "train",
                 num_workers=cpu_count(),
                 pin_memory=torch.cuda.is_available()
             )
@@ -259,7 +242,7 @@ if __name__ == "__main__":
     # in the dictionary), we instead ask what (pre-defined) vocabulary to use.
     # parser.add_argument("-eb", "--embedding_size", type=int, default=300)
     parser.add_argument("-vb", "--vocab", type=str, default="aa20")
-    parser.add_argument("-hs", "--hidden_size", type=int, default=64)
+    parser.add_argument("-hs", "--hidden_size", type=int, default=50)
     parser.add_argument("-ls", "--latent_size", type=int, default=20)
 
     parser.add_argument("-af", "--anneal_function", type=str, default="logistic")
@@ -274,9 +257,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     args.vocab = args.vocab.lower()
-    args.anneal_function = args.anneal_function.lower()
+    if args.anneal_function == "None":
+        args.anneal_function = None
+    else:
+        args.anneal_function = args.anneal_function.lower()
 
     assert args.vocab in VOCABS
-    assert args.anneal_function in ["logistic", "linear"]
+    assert args.anneal_function in ["logistic", "linear", None]
 
     main(args)
