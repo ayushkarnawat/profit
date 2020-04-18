@@ -36,7 +36,7 @@ _dataset = torch.Tensor(len(dataset), 1)
 _labels = dataset[:]["arr_3"].view(-1).tolist()
 # Create subset indicies
 subset_idx = split_method_dict["stratified"]().train_valid_test_split(
-    _dataset, _labels, frac_train=0.8, frac_val=0.2, frac_test=0.,
+    _dataset, _labels, frac_train=0.8, frac_valid=0.2, frac_test=0.,
     return_idxs=True, n_bins=5)
 stratified = {split: Subset(dataset, sorted(idx))
               for split, idx in zip(splits, subset_idx)}

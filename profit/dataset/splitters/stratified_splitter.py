@@ -69,7 +69,7 @@ class StratifiedSplitter(BaseSplitter):
     def _split(self,
                dataset: np.ndarray,
                frac_train: float = 0.8,
-               frac_val: float = 0.1,
+               frac_valid: float = 0.1,
                frac_test: float = 0.1,
                **kwargs: Dict[str, Any]) -> Tuple[np.ndarray, ...]:
         """
@@ -84,7 +84,7 @@ class StratifiedSplitter(BaseSplitter):
         frac_train: float, default=0.8
             Fraction of data to be used in training.
 
-        frac_val: float, default=0.1
+        frac_valid: float, default=0.1
             Fraction of data to be used in validation.
 
         frac_test: float, default=0.1
@@ -96,7 +96,7 @@ class StratifiedSplitter(BaseSplitter):
             The train, val, and test set indicies, respectively.
         """
         # Test inputs
-        np.testing.assert_almost_equal(frac_train + frac_val + frac_test, 1.0)
+        np.testing.assert_almost_equal(frac_train + frac_valid + frac_test, 1.0)
 
         seed = kwargs.get('seed', None)
         labels = kwargs.get('labels', None)
@@ -142,7 +142,7 @@ class StratifiedSplitter(BaseSplitter):
             classes = np.unique(labels)
 
         n_classes = classes.shape[0]
-        n_total_val = int(frac_val * len(dataset))
+        n_total_val = int(frac_valid * len(dataset))
         n_total_test = int(frac_test * len(dataset))
 
         class_counts = np.bincount(labels)
@@ -181,7 +181,7 @@ class StratifiedSplitter(BaseSplitter):
                                dataset: np.ndarray,
                                labels: Optional[np.ndarray] = None,
                                frac_train: float = 0.8,
-                               frac_val: float = 0.1,
+                               frac_valid: float = 0.1,
                                frac_test: float = 0.1,
                                n_bins: int = 10,
                                return_idxs: bool = True,
@@ -204,7 +204,7 @@ class StratifiedSplitter(BaseSplitter):
         frac_train: float, default=0.8
             Fraction of data to be used in training.
 
-        frac_val: float, default=0.1
+        frac_valid: float, default=0.1
             Fraction of data to be used in validation.
 
         frac_test: float, default=0.1
@@ -231,7 +231,7 @@ class StratifiedSplitter(BaseSplitter):
             The splitted data (train, val, and test) or their indicies.
         """
         return super(StratifiedSplitter, self)\
-            .train_valid_test_split(dataset, frac_train, frac_val, frac_test,
+            .train_valid_test_split(dataset, frac_train, frac_valid, frac_test,
                                     return_idxs, labels=labels, n_bins=n_bins,
                                     seed=seed, task_type=task_type, **kwargs)
 
@@ -240,7 +240,7 @@ class StratifiedSplitter(BaseSplitter):
                           dataset: np.ndarray,
                           labels: Optional[np.ndarray] = None,
                           frac_train: float = 0.8,
-                          frac_val: float = 0.2,
+                          frac_valid: float = 0.2,
                           n_bins: int = 10,
                           return_idxs: bool = True,
                           seed: Optional[int] = None,
@@ -262,7 +262,7 @@ class StratifiedSplitter(BaseSplitter):
         frac_train: float, default=0.8
             Fraction of data to be used in training.
 
-        frac_val: float, default=0.2
+        frac_valid: float, default=0.2
             Fraction of data to be used in validation.
 
         n_bins: int, default=10
@@ -286,6 +286,6 @@ class StratifiedSplitter(BaseSplitter):
             The splitted data (train and val) or their indicies.
         """
         return super(StratifiedSplitter, self)\
-            .train_valid_split(dataset, frac_train, frac_val, return_idxs,
+            .train_valid_split(dataset, frac_train, frac_valid, return_idxs,
                                labels=labels, n_bins=n_bins, seed=seed,
                                task_type=task_type, **kwargs)

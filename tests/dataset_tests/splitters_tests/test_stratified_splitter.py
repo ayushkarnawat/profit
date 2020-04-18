@@ -47,8 +47,9 @@ def test_classification_split(cls_dataset):
     assert (test[:,-1] == 1).sum() == 1
 
     # Split using 0.5 for train, 0.3 for val, and 0.2 for test
-    train, valid, test = splitter.train_valid_test_split(cls_dataset, frac_train=0.5, frac_val=0.3, 
-                                                         frac_test=0.2, return_idxs=False)
+    train, valid, test = splitter.train_valid_test_split(
+        cls_dataset, frac_train=0.5, frac_valid=0.3, frac_test=0.2,
+        return_idxs=False)
     assert type(train) == np.ndarray
     assert train.shape[0] == 15
     assert valid.shape[0] == 9
@@ -80,8 +81,9 @@ def test_regression_split(reg_dataset):
     assert 4.25 < test[:, -1].mean() < 5.75
 
     # Split using 0.5 for train, 0.3 for val, and 0.2 for test
-    train, valid, test = splitter.train_valid_test_split(reg_dataset, frac_train=0.5, frac_val=0.3, 
-                                                         frac_test=0.2, return_idxs=False)
+    train, valid, test = splitter.train_valid_test_split(
+        reg_dataset, frac_train=0.5, frac_valid=0.3, frac_test=0.2,
+        return_idxs=False)
     assert type(train) == np.ndarray
     assert train.shape[0] == 50
     assert valid.shape[0] == 30

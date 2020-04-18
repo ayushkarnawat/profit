@@ -39,7 +39,7 @@ _labels = dataset[:]["arr_1"].view(-1)
 # Create subset indicies
 subset_idx = split_method_dict["stratified"]().train_valid_test_split(
     dataset=_dataset, labels=_labels.tolist(), frac_train=0.9,
-    frac_val=0.1, frac_test=0., return_idxs=True, n_bins=5)
+    frac_valid=0.1, frac_test=0., return_idxs=True, n_bins=5)
 stratified = {split: Subset(dataset, sorted(idx))
               for split, idx in zip(splits, subset_idx)}
 

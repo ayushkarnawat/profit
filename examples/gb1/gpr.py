@@ -26,7 +26,7 @@ _labels = dataset[:]["arr_1"].view(-1)
 # Shuffle, split, and batch
 splits = ["train", "valid"]
 subset_idx = split_method_dict["stratified"]().train_valid_split(_dataset, \
-    _labels.tolist(), frac_train=0.8, frac_val=0.2, n_bins=10, return_idxs=True)
+    _labels.tolist(), frac_train=0.8, frac_valid=0.2, n_bins=10, return_idxs=True)
 stratified = {split: Subset(dataset, sorted(idx))
               for split, idx in zip(splits, subset_idx)}
 

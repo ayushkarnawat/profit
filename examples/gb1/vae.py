@@ -89,7 +89,7 @@ def main(args):
     # Create subset indicies
     subset_idx = split_method_dict["stratified"]().train_valid_test_split(
         dataset=_dataset, labels=_labels.tolist(), frac_train=args.train_size,
-        frac_val=args.valid_size, frac_test=args.test_size, return_idxs=True,
+        frac_valid=args.valid_size, frac_test=args.test_size, return_idxs=True,
         n_bins=5)
     stratified = {split: Subset(dataset, sorted(idx))
                   for split, idx in zip(splits, subset_idx)}
