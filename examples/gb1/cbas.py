@@ -35,6 +35,14 @@ sequences.
 TODO: Should we run the whole experiment at once? By that I mean, do we
 train all generative and predictive models at once rather before and use
 the ones that did well?
+TODO: Different verbosity levels?
+TODO: Determine which is the best option to subset the dataset by. In
+particular, which combination of the oracle/gp pair results in sequences
+that are good in oracle predictions, but are not lead astry in
+uninteresting regions based on the GT predictions (i.e. the preductions
+should stay relatively close to each other from the different
+iterations).
+TODO: Do we save the full results for all samples?
 
 Ok, so it seems that the original paper uses random sequences (~1000)
 from the upper mean of the bimodal distribution to solve the problem to
@@ -72,6 +80,7 @@ What have we learned?
 import copy
 import glob
 import time
+import typing
 import multiprocessing as mp
 
 import numpy as np
@@ -110,13 +119,12 @@ tokenizer = AminoAcidTokenizer("aa20")
 vocab_size = tokenizer.vocab_size
 seqlen = _dataset.size(1)
 
-def load_vaes(seqlen, vocab_size):
-    vae = SequenceVAE(seqlen, vocab_size, hdim=50, latent_size=20)
+def load_vaes(seqlen: int, vocab_size: int) -> typing.Tuple[SequenceVAE, ...]:
+    """Initialize VAE and load weights (only for the prior)."""
+    vae = SequenceVAE(seqlen, vocab_size, hidden_size=50, latent_size=20)
     vae_0 = copy.deepcopy(vae)
     vae_0.load_state_dict(torch.load("bin/3gb1/vae/2020-Apr-17-15:03:21/E0009.pt"))
     return vae, vae_0
-
-vae, vae_0 = load_vaes(seqlen, vocab_size)
 
 # Initialize and load weights (all oracles)
 paths = sorted(glob.glob("bin/3gb1/oracle/*/E*"))
@@ -136,33 +144,60 @@ gpr_paths = dict(zip(metadata, paths))
 all_gps = {desc: torch.load(path) for desc, path in gpr_paths.items()}
 
 
-def cbas(oracle: SequenceOracle, gp: SequenceGPR, vae: SequenceVAE,
+def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE,
          vae_0: SequenceVAE, topk: int = 10, verbose: bool = False):
-    # For sampling the probs computed
-    sample = True
+    """Full CbAS procedure.
 
-    # FOR ORACLE MODEL(S)
-    num_oracles = 1
+    The procedure stops when the weights are below a certain threshold,
+    i.e. a proxy for the model will not explore new "interesting"
+    sequences because they will not likely return any decent oracle values.
+    """
+    # Check if the models are the same (aka check if the number of parameters
+    # are the same for each layer). For now, we just check if the keys have the
+    # same values. TODO: more accurate comparison, i.e. size check for each layer.
+    for vae_key, vae_0_key in zip(vae.__dict__.keys(), vae_0.__dict__.keys()):
+        if (not vae_key.startswith("_") and
+                vae.__dict__[vae_key] != vae_0.__dict__[vae_0_key]):
+            raise ValueError("Models do not match!")
+
+    num_iters = 20      # num iterations, how long do we want to run this for?
+    num_samples = 500   # num of new seqs to sample per iteration
+    sample = True       # should we sample the probs computed
+
+    # Add noise for variance (if only using one oracle)
+    if not isinstance(oracles, list):
+        oracles = [oracles]
+    num_oracles = len(oracles)
     homoscedastic = num_oracles == 1
-    homo_y_var = 0.1
+    homo_var = 0.1
 
     # For weights
     quantile = 0.95
     threshold = 1e-6
 
     # Bookkeeping
-    save_train_seqs = False # save topk (even if they are in original dataset)
+    stats = torch.zeros(num_iters, 7)
+    save_train_seqs = False # save within topk (even if they are in init dataset)
+    # topk_tracker = {
+    #     "seq": np.zeros((num_iters, topk), dtype=object),
+    #     "y_gt": torch.zeros(num_iters, topk),
+    #     "y_oracle": torch.zeros(num_iters, topk)
+    # }
+    # # Set the first iter values to defaults
+    # topk_tracker["seq"][0, :] = np.array([None] * topk)
+    # topk_tracker["y_gt"][0, :] = tensor([-np.inf] * topk)
+    # topk_tracker["y_oracle"][0, :] = tensor([-np.inf] * topk)
     topk_tracker = {
         "seq": np.array([None] * topk),
-        "y_gt": torch.cat([tensor([-np.inf])] * topk),
-        "y_oracle": torch.cat([tensor([-np.inf])] * topk)
+        "y_gt": torch.Tensor([-np.inf] * topk),
+        "y_oracle": torch.Tensor([-np.inf] * topk),
     }
     y_star = -np.inf
 
     # Iteratively generate new samples and determine their fitness
-    for t in range(20):
+    for t in range(num_iters):
         # Sample (plausible) sequences from the latent distribution z
-        zt = torch.randn(50, 20) # size=(samples=50, latent_size=20)
+        zt = torch.randn(num_samples, vae.latent_size)
         if t > 0:
             # Since we don't perform any activation on the outputs of the generative
             # model (this is due to how the cross_entropy loss is computed in
@@ -172,8 +207,8 @@ def cbas(oracle: SequenceOracle, gp: SequenceGPR, vae: SequenceVAE,
                 # Compute softmax (logits -> probs) across each amino acid
                 Xt_p = F.softmax(vae.decode(zt), dim=-1)
             if sample:
-                # Sample from the computed probs to make potential sequences that
-                # are outside our learned representation (strategy used by CbAS).
+                # Sample from the computed probs to make potential sequences
+                # that are somewhat outside our learned representation.
                 Xt_sampled = torch.zeros_like(Xt_p)
                 for i in range(Xt_p.size(0)):
                     for j in range(Xt_p.size(1)):
@@ -192,9 +227,9 @@ def cbas(oracle: SequenceOracle, gp: SequenceGPR, vae: SequenceVAE,
         Xt.scatter_(2, torch.unsqueeze(Xt_aa, 2), 1)
 
         # Evaluate sampled points on oracle(s)
-        yt, yt_var = avg_oracle_preds(oracle, Xt)
+        yt, yt_var = avg_oracle_preds(oracles, Xt)
         if homoscedastic:
-            yt_var = torch.ones_like(yt) * homo_y_var
+            yt_var = torch.ones_like(yt) * homo_var
         # Evaluate sampled points on ground truth (aka GP)
         if t == 0 and _labels is not None:
             yt_gt = _labels
@@ -203,9 +238,9 @@ def cbas(oracle: SequenceOracle, gp: SequenceGPR, vae: SequenceVAE,
 
         # Recompute weights for each sample (aka sequence)
         if t > 0:
-            # Select log values (output of the current generative model) at indicies
-            # where certain vocab (aka amino acid) were sampled. NOTE: We compute
-            # the log for numerical stability (prevents overflow).
+            # Select log values (output of the current generative model) at
+            # indicies where certain vocab (aka amino acid) were sampled. NOTE:
+            # We compute the log for numerical stability (prevents overflow).
             log_pxt = torch.sum(torch.log(Xt_p) * Xt, dim=(1, 2))
 
             # Similarly for the inital generative model (prior)
@@ -263,12 +298,6 @@ def cbas(oracle: SequenceOracle, gp: SequenceGPR, vae: SequenceVAE,
                   topk_tracker["y_gt"][top1_idx],
                   topk_tracker["y_oracle"][top1_idx])
 
-        # For debugging purposes only, TODO: potentially remove
-        # Prints the sequence sampled/generated in current iter
-        if t > 0 and verbose:
-            for seq in Xt_aa.numpy():
-                print("".join(tokenizer.decode(seq)))
-
         # Train VAE model
         if t == 0:
             vae.load_state_dict(vae_0.state_dict())
@@ -306,7 +335,7 @@ def cbas(oracle: SequenceOracle, gp: SequenceGPR, vae: SequenceVAE,
                     batch_size = onehot.size(0)
                     batch_weights = batch[1].to(device).view(-1, 1)
                     # Forward pass
-                    pred, mu, logvar, z = vae(onehot)
+                    pred, mu, logvar, _ = vae(onehot)
                     # Loss calculation
                     nll_loss, kl_loss, kl_weight = L.elbo_loss(
                         pred, target, mu, logvar, anneal_function=None, step=step,
@@ -314,9 +343,6 @@ def cbas(oracle: SequenceOracle, gp: SequenceGPR, vae: SequenceVAE,
                     # Reweight nll_loss w/ sample weights
                     nll_loss = (nll_loss * batch_weights).sum()
                     loss = (nll_loss + kl_weight * kl_loss) / batch_size
-                    # if verbose:
-                    #     print(it, loss.item(), nll_loss.item(), kl_weight,
-                    #           kl_loss.item())
                     # Compute gradients and update params/weights
                     optimizer.zero_grad()
                     loss.backward()
@@ -325,30 +351,29 @@ def cbas(oracle: SequenceOracle, gp: SequenceGPR, vae: SequenceVAE,
 
     return topk_tracker
 
-tracker = cbas(all_oracles["g-mean"], all_gps["g-mean"], vae=vae, vae_0=vae_0,
-               topk=10, verbose=1)
-print(tracker)
+# tracker = cbas(all_oracles["g-mean"], all_gps["g-mean"], vae=vae, vae_0=vae_0,
+#                topk=10, verbose=1)
+# print(tracker)
 
 # Run across all oracles and gp and dump results for topk
-# dump = {}
-# topk = 10
-# for oracle_metadata, oracle in all_oracles.items():
-#     for gp_metadata, gp in all_gps.items():
-#         save_str = f"oracle={oracle_metadata}__gp={gp_metadata}"
-#         # We have to copy VAE/VAE_0 since they will still hold info from
-#         # prev run
-#         vae, vae_0 = load_vaes(seqlen, vocab_size)
-#         tracker = cbas(oracle, gp, vae=vae, vae_0=vae_0, topk=topk)
-#         print(tracker)
-#         # Convert ndarrays to list, so that we can save dumps properly
-#         tracker["seq"] = tracker["seq"].tolist()
-#         tracker["y_oracle"] = tracker["y_oracle"].numpy().tolist()
-#         tracker["y_gt"] = tracker["y_gt"].numpy().tolist()
-#         dump[save_str] = tracker
+dump = {}
+topk = 10
+for oracle_metadata, oracle in all_oracles.items():
+    for gp_metadata, gp in all_gps.items():
+        save_str = f"oracle={oracle_metadata}__gp={gp_metadata}"
+        # Copy VAE/VAE_0 since original obj. will still hold info from prev run
+        vae, vae_0 = load_vaes(seqlen, vocab_size)
+        tracker = cbas(oracle, gp, vae=vae, vae_0=vae_0, topk=topk, verbose=True)
+        print(tracker)
+        # Convert ndarrays to list, so that we can save dumps properly
+        tracker["seq"] = tracker["seq"].tolist()
+        tracker["y_gt"] = tracker["y_gt"].numpy().tolist()
+        tracker["y_oracle"] = tracker["y_oracle"].numpy().tolist()
+        dump[save_str] = tracker
 
-# import os
-# import json
-# save_dir = "dumps/3gb1/cbas/"
-# os.makedirs(save_dir, exist_ok=True)
-# with open(os.path.join(save_dir, f"k={topk}.json"), "w") as dump_file:
-#     json.dump(dump, dump_file)
+import os
+import json
+save_dir = "dumps/3gb1/cbas/"
+os.makedirs(save_dir, exist_ok=True)
+with open(os.path.join(save_dir, f"k={topk}.json"), "w") as dump_file:
+    json.dump(dump, dump_file)

@@ -77,19 +77,21 @@ class SequenceVAE(BaseVAE):
     def __init__(self,
                  seqlen: int,
                  vocab_size: int,
-                 hdim: int = 64,
+                 hidden_size: int = 64,
                  latent_size: int = 20) -> None:
         super(SequenceVAE, self).__init__()
         self.seqlen = seqlen
         self.vocab_size = vocab_size
+        self.hidden_size = hidden_size
+        self.latent_size = latent_size
 
         # Probablistic encoder
-        self.fc1 = nn.Linear(seqlen * vocab_size, hdim)
-        self.fc21 = nn.Linear(hdim, latent_size)
-        self.fc22 = nn.Linear(hdim, latent_size)
+        self.fc1 = nn.Linear(seqlen * vocab_size, hidden_size)
+        self.fc21 = nn.Linear(hidden_size, latent_size)
+        self.fc22 = nn.Linear(hidden_size, latent_size)
         # Probablistic decoder
-        self.fc3 = nn.Linear(latent_size, hdim)
-        self.fc4 = nn.Linear(hdim, seqlen * vocab_size)
+        self.fc3 = nn.Linear(latent_size, hidden_size)
+        self.fc4 = nn.Linear(hidden_size, seqlen * vocab_size)
         # Reshape occurs here (see self.decode())
         # size is now: (seqlen * vocab_size) -> (seqlen, vocab_size)
         self.fc5 = nn.Linear(vocab_size, vocab_size)
