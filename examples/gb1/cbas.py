@@ -164,24 +164,26 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
     num_samples = 500   # num of new seqs to sample per iteration
     sample = True       # should we sample the probs computed
 
-    # Add noise for variance (if only using one oracle)
+    # Variance noise (only if using one oracle)
     if not isinstance(oracles, list):
         oracles = [oracles]
     num_oracles = len(oracles)
     homoscedastic = num_oracles == 1
     homo_var = 0.1
 
-    # Weights
-    quantile = 0.95
-    threshold = 1e-6
+    # Weight sampling
+    quantile = 0.95     # percentile (oracle samples above this are used)
+    threshold = 1e-6    # weights cutoff (samples below this weight are removed)
 
     # Bookkeeping
-    stats = torch.zeros(num_iters, 7)
     save_train_seqs = False # save seqs from initial dataset within topk?
-    topk_tracker = {
-        "seq": np.zeros((num_iters, topk), dtype=object),
-        "y_gt": torch.zeros(num_iters, topk),
-        "y_oracle": torch.zeros(num_iters, topk)
+    tracker = {
+        "stats": torch.zeros(num_iters, 7),
+        "topk": {
+            "seq": np.zeros((num_iters, topk), dtype=object),
+            "y_gt": torch.zeros(num_iters, topk),
+            "y_oracle": torch.zeros(num_iters, topk)
+        }
     }
     y_star = -np.inf
 
@@ -251,10 +253,7 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
         else:
             weights = torch.ones(yt.shape[0])
 
-        # Update trackers (bookkeeping)
-        stats[t] = torch.Tensor([yt.max(), yt.mean(), yt.std(), yt_gt.max(),
-                                 yt_gt.mean(), yt_gt.std(), yt_var.mean()])
-
+        # Update tracker (bookkeeping)
         # Retrieve the topk values from the previous iteration, so that we can
         # compare from the previous run.
         if t == 0:
@@ -266,9 +265,9 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
             }
         else:
             temp_tracker = {
-                "seq": topk_tracker["seq"][t-1:t].flatten(),
-                "y_gt": topk_tracker["y_gt"][t-1:t].view(-1),
-                "y_oracle": topk_tracker["y_oracle"][t-1:t].view(-1),
+                "seq": tracker["topk"]["seq"][t-1:t].flatten(),
+                "y_gt": tracker["topk"]["y_gt"][t-1:t].view(-1),
+                "y_oracle": tracker["topk"]["y_oracle"][t-1:t].view(-1),
             }
 
         if save_train_seqs:
@@ -290,7 +289,7 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
             # Save all sequences which are not in original dataset
             for (xt_aa, y, y_gt) in zip(Xt_aa, yt, yt_gt):
                 seq = "".join(tokenizer.decode(xt_aa.numpy()))
-                if (seq not in topk_tracker["seq"] and
+                if (seq not in tracker["topk"]["seq"] and
                         not torch.any((xt_aa == _dataset).all(axis=-1))):
                     # Concatenate from previous iteration
                     temp_tracker["seq"] = np.concatenate((temp_tracker["seq"], [seq]))
@@ -299,17 +298,20 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
 
         # Store only the topk sequences
         topk_idx = torch.sort(temp_tracker["y_oracle"]).indices[-topk:]
-        topk_tracker["seq"][t] = np.array(temp_tracker["seq"])[topk_idx.tolist()]
-        topk_tracker["y_gt"][t] = temp_tracker["y_gt"][topk_idx]
-        topk_tracker["y_oracle"][t] = temp_tracker["y_oracle"][topk_idx]
+        tracker["topk"]["seq"][t] = np.array(temp_tracker["seq"])[topk_idx.tolist()]
+        tracker["topk"]["y_gt"][t] = temp_tracker["y_gt"][topk_idx]
+        tracker["topk"]["y_oracle"][t] = temp_tracker["y_oracle"][topk_idx]
+        tracker["stats"][t] = torch.Tensor([yt.max(), yt.mean(), yt.std(),
+                                            yt_gt.max(), yt_gt.mean(),
+                                            yt_gt.std(), yt_var.mean()])
 
         # For printing purposes only, TODO: potentially remove
         if verbose:
-            top1_idx = torch.argmax(topk_tracker["y_oracle"][t])
-            print(t, topk_tracker["seq"][t, top1_idx],
-                  topk_tracker["y_gt"][t, top1_idx],
-                  topk_tracker["y_oracle"][t, top1_idx])
-            print(stats[t])
+            top1_idx = torch.argmax(tracker["topk"]["y_oracle"][t])
+            print(t, tracker["topk"]["seq"][t, top1_idx],
+                  tracker["topk"]["y_gt"][t, top1_idx],
+                  tracker["topk"]["y_oracle"][t, top1_idx])
+            print(tracker["stats"][t])
 
         # Train VAE model
         if t == 0:
@@ -361,7 +363,7 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
                     optimizer.step()
                     step += 1
 
-    return topk_tracker, stats
+    return tracker
 
 vae, vae_0 = load_vaes(seqlen, vocab_size)
 tracker, stats = cbas(all_oracles["g-mean"], all_gps["g-mean"], vae=vae,
