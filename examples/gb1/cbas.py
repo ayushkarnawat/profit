@@ -171,26 +171,17 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
     homoscedastic = num_oracles == 1
     homo_var = 0.1
 
-    # For weights
+    # Weights
     quantile = 0.95
     threshold = 1e-6
 
     # Bookkeeping
     stats = torch.zeros(num_iters, 7)
-    save_train_seqs = False # save within topk (even if they are in init dataset)
-    # topk_tracker = {
-    #     "seq": np.zeros((num_iters, topk), dtype=object),
-    #     "y_gt": torch.zeros(num_iters, topk),
-    #     "y_oracle": torch.zeros(num_iters, topk)
-    # }
-    # # Set the first iter values to defaults
-    # topk_tracker["seq"][0, :] = np.array([None] * topk)
-    # topk_tracker["y_gt"][0, :] = tensor([-np.inf] * topk)
-    # topk_tracker["y_oracle"][0, :] = tensor([-np.inf] * topk)
+    save_train_seqs = False # save seqs from initial dataset within topk?
     topk_tracker = {
-        "seq": np.array([None] * topk),
-        "y_gt": torch.Tensor([-np.inf] * topk),
-        "y_oracle": torch.Tensor([-np.inf] * topk),
+        "seq": np.zeros((num_iters, topk), dtype=object),
+        "y_gt": torch.zeros(num_iters, topk),
+        "y_oracle": torch.zeros(num_iters, topk)
     }
     y_star = -np.inf
 
@@ -199,9 +190,10 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
         # Sample (plausible) sequences from the latent distribution z
         zt = torch.randn(num_samples, vae.latent_size)
         if t > 0:
-            # Since we don't perform any activation on the outputs of the generative
-            # model (this is due to how the cross_entropy loss is computed in
-            # torch), we need to apply a softmax to get probs for each vocab.
+            # Since we don't perform any activation on the outputs of the
+            # generative model (this is due to how the cross_entropy loss is
+            # computed in torch), we need to apply a softmax to get probs for
+            # each vocab.
             vae.eval()
             with torch.no_grad():
                 # Compute softmax (logits -> probs) across each amino acid
@@ -259,12 +251,31 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
         else:
             weights = torch.ones(yt.shape[0])
 
-        # Bookkeeping
+        # Update trackers (bookkeeping)
+        stats[t] = torch.Tensor([yt.max(), yt.mean(), yt.std(), yt_gt.max(),
+                                 yt_gt.mean(), yt_gt.std(), yt_var.mean()])
+
+        # Retrieve the topk values from the previous iteration, so that we can
+        # compare from the previous run.
+        if t == 0:
+            # Set the first iter values to defaults
+            temp_tracker = {
+                "seq": np.array([None] * topk),
+                "y_gt": torch.Tensor([-np.inf] * topk),
+                "y_oracle": torch.Tensor([-np.inf] * topk),
+            }
+        else:
+            temp_tracker = {
+                "seq": topk_tracker["seq"][t-1:t].flatten(),
+                "y_gt": topk_tracker["y_gt"][t-1:t].view(-1),
+                "y_oracle": topk_tracker["y_oracle"][t-1:t].view(-1),
+            }
+
         if save_train_seqs:
             # With every iteration, we can replace all topk sequences. As such,
             # we can simply just find the topk from each yt, combine the results
             # with the previous iteration, and choose the new topk variants from
-            # that combined set (2*topk)
+            # that combined set (which has cardinality of 2*topk)
             yt_topk_idx = torch.sort(yt).indices[-topk:]
             yt_topk = yt[yt_topk_idx]
             yt_gt_topk = yt_gt[yt_topk_idx].squeeze()
@@ -272,31 +283,33 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
                                for Xaa in Xt_aa[yt_topk_idx].numpy()]
 
             # Concat tensors together
-            topk_tracker["seq"] = np.concatenate((topk_tracker["seq"], oracle_topk_seq))
-            topk_tracker["y_gt"] = torch.cat([topk_tracker["y_gt"], yt_gt_topk])
-            topk_tracker["y_oracle"] = torch.cat([topk_tracker["y_oracle"], yt_topk])
+            temp_tracker["seq"] = np.concatenate((temp_tracker["seq"], oracle_topk_seq))
+            temp_tracker["y_gt"] = torch.cat([temp_tracker["y_gt"], yt_gt_topk])
+            temp_tracker["y_oracle"] = torch.cat([temp_tracker["y_oracle"], yt_topk])
         else:
             # Save all sequences which are not in original dataset
             for (xt_aa, y, y_gt) in zip(Xt_aa, yt, yt_gt):
                 seq = "".join(tokenizer.decode(xt_aa.numpy()))
                 if (seq not in topk_tracker["seq"] and
                         not torch.any((xt_aa == _dataset).all(axis=-1))):
-                    topk_tracker["seq"] = np.concatenate((topk_tracker["seq"], [seq]))
-                    topk_tracker["y_oracle"] = torch.cat([topk_tracker["y_oracle"], y.view(-1)])
-                    topk_tracker["y_gt"] = torch.cat([topk_tracker["y_gt"], y_gt.view(-1)])
+                    # Concatenate from previous iteration
+                    temp_tracker["seq"] = np.concatenate((temp_tracker["seq"], [seq]))
+                    temp_tracker["y_gt"] = torch.cat([temp_tracker["y_gt"], y_gt.view(-1)])
+                    temp_tracker["y_oracle"] = torch.cat([temp_tracker["y_oracle"], y.view(-1)])
 
-        # Select topk indicies (based off oracle value)
-        topk_idx = torch.sort(topk_tracker["y_oracle"]).indices[-topk:]
-        topk_tracker["seq"] = np.array(topk_tracker["seq"])[topk_idx.tolist()]
-        topk_tracker["y_gt"] = topk_tracker["y_gt"][topk_idx]
-        topk_tracker["y_oracle"] = topk_tracker["y_oracle"][topk_idx]
+        # Store only the topk sequences
+        topk_idx = torch.sort(temp_tracker["y_oracle"]).indices[-topk:]
+        topk_tracker["seq"][t] = np.array(temp_tracker["seq"])[topk_idx.tolist()]
+        topk_tracker["y_gt"][t] = temp_tracker["y_gt"][topk_idx]
+        topk_tracker["y_oracle"][t] = temp_tracker["y_oracle"][topk_idx]
 
         # For printing purposes only, TODO: potentially remove
         if verbose:
-            top1_idx = torch.argmax(topk_tracker["y_oracle"])
-            print(t, topk_tracker["seq"][top1_idx],
-                  topk_tracker["y_gt"][top1_idx],
-                  topk_tracker["y_oracle"][top1_idx])
+            top1_idx = torch.argmax(topk_tracker["y_oracle"][t])
+            print(t, topk_tracker["seq"][t, top1_idx],
+                  topk_tracker["y_gt"][t, top1_idx],
+                  topk_tracker["y_oracle"][t, top1_idx])
+            print(stats[t])
 
         # Train VAE model
         if t == 0:
@@ -318,14 +331,13 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
                 pin_memory=torch.cuda.is_available(),
             )
 
-            # Initialize optimizer; TODO: Restart or continue from previous? This is
-            # important because of weight decay part of AdamW.
+            # Initialize optimizer; NOTE: Restart or continue from previous run?
+            # Important because of weight decay param of AdamW.
             optimizer = optim.AdamW(vae.parameters(), lr=1e-3)
 
             # Restart training with new samples
             # NOTE: Do we restart or continue from the previous run of the VAE?
-            # This primarily affects the weight of the KL-divergence term cuz of
-            # step param
+            # This affects the weight of the KL-divergence term (aka step param)
             step = 0
             vae.train()
             for epoch in range(10):
@@ -349,31 +361,33 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
                     optimizer.step()
                     step += 1
 
-    return topk_tracker
+    return topk_tracker, stats
 
-# tracker = cbas(all_oracles["g-mean"], all_gps["g-mean"], vae=vae, vae_0=vae_0,
-#                topk=10, verbose=1)
-# print(tracker)
+vae, vae_0 = load_vaes(seqlen, vocab_size)
+tracker, stats = cbas(all_oracles["g-mean"], all_gps["g-mean"], vae=vae,
+                      vae_0=vae_0, topk=10, verbose=1)
+print(tracker)
+print(stats)
 
-# Run across all oracles and gp and dump results for topk
-dump = {}
-topk = 10
-for oracle_metadata, oracle in all_oracles.items():
-    for gp_metadata, gp in all_gps.items():
-        save_str = f"oracle={oracle_metadata}__gp={gp_metadata}"
-        # Copy VAE/VAE_0 since original obj. will still hold info from prev run
-        vae, vae_0 = load_vaes(seqlen, vocab_size)
-        tracker = cbas(oracle, gp, vae=vae, vae_0=vae_0, topk=topk, verbose=True)
-        print(tracker)
-        # Convert ndarrays to list, so that we can save dumps properly
-        tracker["seq"] = tracker["seq"].tolist()
-        tracker["y_gt"] = tracker["y_gt"].numpy().tolist()
-        tracker["y_oracle"] = tracker["y_oracle"].numpy().tolist()
-        dump[save_str] = tracker
+# # Run across all oracles and gp and dump results for topk
+# dump = {}
+# topk = 10
+# for oracle_metadata, oracle in all_oracles.items():
+#     for gp_metadata, gp in all_gps.items():
+#         save_str = f"oracle={oracle_metadata}__gp={gp_metadata}"
+#         # Copy VAE/VAE_0 since original obj. will still hold info from prev run
+#         vae, vae_0 = load_vaes(seqlen, vocab_size)
+#         tracker, statistics = cbas(oracle, gp, vae=vae, vae_0=vae_0, topk=topk, verbose=True)
+#         print(tracker, statistics)
+#         # Convert ndarrays to list, so that we can save dumps properly
+#         tracker["seq"] = tracker["seq"].tolist()
+#         tracker["y_gt"] = tracker["y_gt"].numpy().tolist()
+#         tracker["y_oracle"] = tracker["y_oracle"].numpy().tolist()
+#         dump[save_str] = tracker
 
-import os
-import json
-save_dir = "dumps/3gb1/cbas/"
-os.makedirs(save_dir, exist_ok=True)
-with open(os.path.join(save_dir, f"k={topk}.json"), "w") as dump_file:
-    json.dump(dump, dump_file)
+# import os
+# import json
+# save_dir = "dumps/3gb1/cbas/"
+# os.makedirs(save_dir, exist_ok=True)
+# with open(os.path.join(save_dir, f"k={topk}.json"), "w") as dump_file:
+#     json.dump(dump, dump_file)
