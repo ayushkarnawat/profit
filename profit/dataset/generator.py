@@ -5,6 +5,7 @@ import itertools
 import numpy as np
 import pandas as pd
 
+from profit.utils.data_utils import aa1
 from profit.utils.io_utils import maybe_create_dir
 
 
@@ -26,9 +27,7 @@ def gen(n: int) -> np.ndarray:
     >>> combs = gen(n=2)
     ['AA', 'AR', 'AN', 'AD', ..., 'VV']
     """
-    acids = ['A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I',
-             'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V']
-    combs = list(itertools.product(acids, repeat=n))
+    combs = list(itertools.product(aa1, repeat=n))
     return np.array(["".join(comb) for comb in combs])
 
 
