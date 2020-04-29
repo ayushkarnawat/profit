@@ -275,10 +275,9 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
 
         if save_train_seqs:
             # Since we only save atmost num samples per iteration, if the number
-            # of values in the orignal dataset is greater, then we save only the
-            # top num samples. Alternatively, if it is less, we save the values
-            # and use -np.inf (or None equivalently) for the rest. NOTE: We
-            # urrently save duplicates seqs, should we remove them?
+            # of values in the original dataset is greater than num samples, we
+            # save only the top num samples. Alternatively, if it is less, we
+            # save the all the values and use -np.inf (or None) for the rest.
             yt_samples_idx = torch.sort(yt).indices[-num_samples:]
             yt_samples = yt[yt_samples_idx]
             yt_gt_samples = yt_gt[yt_samples_idx].squeeze()
@@ -289,12 +288,10 @@ def cbas(oracles: typing.List[SequenceOracle], gp: SequenceGPR, vae: SequenceVAE
             temp_tracker["y_gt"] = torch.cat([temp_tracker["y_gt"], yt_samples])
             temp_tracker["y_oracle"] = torch.cat([temp_tracker["y_oracle"], yt_gt_samples])
         else:
-            # Save all sequences which are not in original dataset; doesn't save
-            # duplicate seqs
+            # Save all sequences which are not in original dataset
             for (xt_aa, y, y_gt) in zip(Xt_aa, yt, yt_gt):
                 seq = "".join(tokenizer.decode(xt_aa.numpy()))
-                if (seq not in temp_tracker["seq"] and
-                        not torch.any((xt_aa == _dataset).all(axis=-1))):
+                if not torch.any((xt_aa == _dataset).all(axis=-1)):
                     # Concatenate all valid sequences
                     temp_tracker["seq"] = np.concatenate((temp_tracker["seq"], [seq]))
                     temp_tracker["y_gt"] = torch.cat([temp_tracker["y_gt"], y_gt.view(-1)])
