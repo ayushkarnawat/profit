@@ -87,9 +87,12 @@ def main(args):
 
     # Split train/val/test sets randomly
     _dataset = dataset[:]["arr_0"]
-    subset_idx = split_method_dict["random"]().train_valid_test_split(
-        dataset=_dataset, frac_train=args.train_size, frac_valid=args.valid_size,
-        frac_test=args.test_size, return_idxs=True)
+    _labels = dataset[:]["arr_1"].view(-1)
+    # Create subset indicies
+    subset_idx = split_method_dict["stratified"]().train_valid_test_split(
+        dataset=_dataset, labels=_labels.tolist(), frac_train=args.train_size,
+        frac_valid=args.valid_size, frac_test=args.test_size, return_idxs=True,
+        n_bins=5)
     stratified = {split: Subset(dataset, sorted(idx))
                   for split, idx in zip(splits, subset_idx)}
 

@@ -12,7 +12,7 @@ class RandomSplitter(BaseSplitter):
     def _split(self,
                dataset: np.ndarray,
                frac_train: float = 0.8,
-               frac_val: float = 0.1,
+               frac_valid: float = 0.1,
                frac_test: float = 0.1,
                **kwargs: Dict[str, Any]) -> Tuple[np.ndarray, ...]:
         """
@@ -27,7 +27,7 @@ class RandomSplitter(BaseSplitter):
         frac_train: float, default=0.8
             Fraction of data to be used in training.
 
-        frac_val: float, default=0.1
+        frac_valid: float, default=0.1
             Fraction of data to be used in validation.
 
         frac_test: float, default=0.1
@@ -40,7 +40,7 @@ class RandomSplitter(BaseSplitter):
         """
         # Test inputs
         seed = kwargs.get('seed', None)
-        np.testing.assert_almost_equal(frac_train + frac_val + frac_test, 1.0)
+        np.testing.assert_almost_equal(frac_train + frac_valid + frac_test, 1.0)
 
         if seed is not None:
             # Ensure same permutation is generated everytime
@@ -48,7 +48,7 @@ class RandomSplitter(BaseSplitter):
         else:
             shuffled = np.random.permutation(len(dataset))
         train_size = int(len(dataset) * frac_train)
-        val_size = int(len(dataset) * frac_val)
+        val_size = int(len(dataset) * frac_valid)
         return (shuffled[:train_size], shuffled[train_size:train_size + val_size],
                 shuffled[train_size + val_size:])
 
@@ -73,7 +73,7 @@ class RandomSplitter(BaseSplitter):
         frac_train: float, default=0.8
             Fraction of data to be used in training.
 
-        frac_val: float, default=0.1
+        frac_valid: float, default=0.1
             Fraction of data to be used in validation.
 
         frac_test: float, default=0.1
@@ -91,15 +91,14 @@ class RandomSplitter(BaseSplitter):
         splitted_data: tuple of np.ndarrays
             The splitted data (train, val, and test) or their indicies.
         """
-        return super(RandomSplitter, self)\
-            .train_valid_test_split(dataset, frac_train, frac_valid, frac_test,
-                                    return_idxs, seed=seed, **kwargs)
+        return super(RandomSplitter, self).train_valid_test_split(dataset, \
+            frac_train, frac_valid, frac_test, return_idxs, seed=seed, **kwargs)
 
 
     def train_valid_split(self,
                           dataset: np.ndarray,
                           frac_train: float = 0.8,
-                          frac_val: float = 0.2,
+                          frac_valid: float = 0.2,
                           return_idxs: bool = True,
                           seed: Optional[int] = None,
                           **kwargs: Dict[str, Any]) -> Tuple[np.ndarray, ...]:
@@ -115,7 +114,7 @@ class RandomSplitter(BaseSplitter):
         frac_train: float, default=0.8
             Fraction of data to be used in training.
 
-        frac_val: float, default=0.2
+        frac_valid: float, default=0.2
             Fraction of data to be used in validation.
 
         return_idxs: bool, default=True
@@ -130,6 +129,5 @@ class RandomSplitter(BaseSplitter):
         splitted_data: tuple of np.ndarrays
             The splitted data (train and val) or their indicies.
         """
-        return super(RandomSplitter, self)\
-            .train_valid_split(dataset, frac_train, frac_val, return_idxs,
-                               seed=seed, **kwargs)
+        return super(RandomSplitter, self).train_valid_split(
+            dataset, frac_train, frac_valid, return_idxs, seed=seed, **kwargs)

@@ -42,7 +42,7 @@ _labels = _labels[high_idx]
 splits = {"train": 1.0, "valid": 0.0}
 subset_idx = split_method_dict["stratified"]().train_valid_split(
     _dataset, _labels.tolist(), frac_train=splits.get("train", 1.0),
-    frac_val=splits.get("valid", 0.0), n_bins=10, return_idxs=True)
+    frac_valid=splits.get("valid", 0.0), n_bins=10, return_idxs=True)
 stratified = {split: Subset(dataset, sorted(idx))
               for split, idx in zip(splits.keys(), subset_idx)}
 train_X, train_y = stratified["train"][:].values()

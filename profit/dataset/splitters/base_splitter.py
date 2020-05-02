@@ -11,7 +11,7 @@ class BaseSplitter(ABC):
     def _split(self,
                dataset: np.ndarray,
                frac_train: float = 0.75,
-               frac_val: float = 0.15,
+               frac_valid: float = 0.15,
                frac_test: float = 0.15,
                **kwargs: Dict[str, Any]):
         raise NotImplementedError

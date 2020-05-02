@@ -200,7 +200,7 @@ class LSTMEncoder(nn.Module):
         return reversed_sequence
 
 
-class LSTMModel(nn.Module):
+class SequenceLSTM(nn.Module):
     """LSTM model for protein-related tasks.
 
     Params:
@@ -238,7 +238,7 @@ class LSTMModel(nn.Module):
                  num_outputs: int = 1,
                  hidden_dropout: float = 0.1,
                  return_hs: bool = False) -> None:
-        super(LSTMModel, self).__init__()
+        super(SequenceLSTM, self).__init__()
         self.embed_matrix = nn.Embedding(vocab_size, input_size)
         self.encoder = LSTMEncoder(input_size, hidden_size, num_layers,
                                    hidden_dropout, return_hs)

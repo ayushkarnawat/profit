@@ -10,7 +10,7 @@ from torch import optim
 from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 
 from profit.dataset.splitters import split_method_dict
-from profit.models.torch.lstm import LSTMModel
+from profit.models.torch.lstm import SequenceLSTM
 from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
 from profit.utils.training_utils.torch.callbacks import EarlyStopping
 from profit.utils.training_utils.torch.callbacks import ModelCheckpoint
@@ -39,7 +39,7 @@ _labels = dataset[:]["arr_1"].view(-1)
 # Create subset indicies
 subset_idx = split_method_dict["stratified"]().train_valid_test_split(
     dataset=_dataset, labels=_labels.tolist(), frac_train=0.9,
-    frac_val=0.1, frac_test=0., return_idxs=True, n_bins=5)
+    frac_valid=0.1, frac_test=0., return_idxs=True, n_bins=5)
 stratified = {split: Subset(dataset, sorted(idx))
               for split, idx in zip(splits, subset_idx)}
 
@@ -61,7 +61,7 @@ sampler = stratified_sampler(stratified["train"][:]["arr_1"].view(-1))
 
 # Init model
 vocab_size = AminoAcidTokenizer("aa20").vocab_size
-model = LSTMModel(vocab_size, input_size=64, hidden_size=128, num_layers=2,
+model = SequenceLSTM(vocab_size, input_size=64, hidden_size=128, num_layers=2,
                   num_outputs=2, hidden_dropout=0.25)
 
 # Init callbacks
