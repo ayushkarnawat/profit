@@ -39,12 +39,13 @@ _dataset = _dataset[high_idx]
 _labels = _labels[high_idx]
 
 # Shuffle, split, and batch
-splits = ["train", "valid"]
-subset_idx = split_method_dict["stratified"]().train_valid_split(_dataset, \
-    _labels.tolist(), frac_train=0.8, frac_val=0.2, n_bins=10, return_idxs=True)
+splits = {"train": 1.0, "valid": 0.0}
+subset_idx = split_method_dict["stratified"]().train_valid_split(
+    _dataset, _labels.tolist(), frac_train=splits.get("train", 1.0),
+    frac_val=splits.get("valid", 0.0), n_bins=10, return_idxs=True)
 stratified = {split: Subset(dataset, sorted(idx))
-              for split, idx in zip(splits, subset_idx)}
-train_X, train_y = stratified["train"].dataset[:].values()
+              for split, idx in zip(splits.keys(), subset_idx)}
+train_X, train_y = stratified["train"][:].values()
 
 # Instantiate a Gaussian Process model
 if use_substitution:
@@ -71,24 +72,25 @@ if isinstance(sigma, torch.Tensor):
 
 tokenizer = AminoAcidTokenizer("aa20")
 pos = [38, 39, 40, 53]
-seqs_char = ["".join(tokenizer.decode(seq)) for seq in _dataset[:, pos].numpy()]
-df = pd.DataFrame(columns=["seq", "true", "pred", "sigma"])
-df["seq"] = seqs_char
-df["true"] = _labels.numpy()
-df["pred"] = y_pred
-df["sigma"] = sigma
-df["is_train"] = [1 if idx in subset_idx[0] else 0 for idx in range(len(dataset))]
+df = pd.DataFrame({
+    "is_train": [1 if idx in subset_idx[0] else 0 for idx in range(len(dataset))],
+    "seq": ["".join(tokenizer.decode(seq)) for seq in _dataset[:, pos].numpy()],
+    "true": _labels.numpy(),
+    "pred": y_pred.flatten(),
+    "sigma": sigma.flatten(),
+})
 
 # If x-axis labels are seq, sort df by seq (in alphabetical order) for "better"
 # visualization; if plotting via index, no need for resorting.
 if plot_seq:
     df = df.sort_values("seq", ascending=True)
 train_only = df.loc[df["is_train"] == 1]
-val_only = df.loc[df["is_train"] == 0]
+valid_only = df.loc[df["is_train"] == 0]
 
 # Determine how well the regressor fit to the dataset
-mse = np.mean(np.square((val_only["pred"] - val_only["true"])))
-print(f"MSE: {mse}")
+train_mse = np.mean(np.square((train_only["pred"] - train_only["true"])))
+valid_mse = np.mean(np.square((valid_only["pred"] - valid_only["true"])))
+print(f"Train MSE: {train_mse}\t Valid MSE: {valid_mse}")
 
 # Plot observations, prediction and 95% confidence interval (2\sigma).
 # NOTE: We plot the whole sequence to avoid erratic line jumps
