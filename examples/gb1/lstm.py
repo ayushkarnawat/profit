@@ -1,13 +1,14 @@
-"""Train GB1 LSTM oracle."""
+"""Train LSTM oracle."""
 
 import os
 import time
 import multiprocessing as mp
+
 import pandas as pd
 
 import torch
 from torch import optim
-from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
+from torch.utils.data import DataLoader, Subset, TensorDataset, WeightedRandomSampler
 
 from profit.dataset.splitters import split_method_dict
 from profit.models.torch.lstm import SequenceLSTM
@@ -23,9 +24,6 @@ timestep = time.strftime("%Y-%b-%d-%H:%M:%S", time.gmtime())
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
 splits = ["train", "valid"]
-# splits = ["train"] if args.train_size > 0 else []
-# splits += ["valid"] if args.valid_size > 0 else []
-# splits += ["test"] if args.test_size > 0 else []
 
 # Preprocess + load the dataset
 dataset = load_dataset("lstm", "primary", labels="Fitness", num_data=-1,
@@ -36,6 +34,31 @@ dataset = load_dataset("lstm", "primary", labels="Fitness", num_data=-1,
 # each batch as the full dataset. See: https://discuss.pytorch.org/t/29907/2
 _dataset = dataset[:]["arr_0"]
 _labels = dataset[:]["arr_1"].view(-1)
+# # Remove samples below a certain threshold
+# high_idx = torch.where(_labels > _labels.mean())
+# dataset = Subset(dataset, sorted(high_idx))
+# _dataset = _dataset[high_idx]
+# _labels = _labels[high_idx]
+
+# Compute sample weights (each sample should get its own weight)
+def sampler(labels: torch.Tensor,
+            nbins: int = 10,
+            stratify: bool = False) -> WeightedRandomSampler:
+    discretize = pd.qcut if stratify else pd.cut
+    bin_labels = torch.LongTensor(discretize(labels.tolist(), nbins,
+                                             labels=False, duplicates="drop"))
+    class_sample_count = torch.LongTensor(
+        [(bin_labels == t).sum() for t in torch.arange(nbins)])
+    weight = 1. / class_sample_count.float()
+    sample_weights = torch.zeros_like(labels)
+    for t in torch.unique(bin_labels):
+        sample_weights[bin_labels == t] = weight[t]
+    return WeightedRandomSampler(sample_weights, len(sample_weights))
+
+# Compute sample weights and add to original dataset
+weights = sampler(_labels, nbins=10, stratify=False).weights.type(torch.float)
+dataset = TensorDataset(*dataset[:].values(), weights)
+
 # Create subset indicies
 subset_idx = split_method_dict["stratified"]().train_valid_test_split(
     dataset=_dataset, labels=_labels.tolist(), frac_train=0.9,
@@ -43,26 +66,13 @@ subset_idx = split_method_dict["stratified"]().train_valid_test_split(
 stratified = {split: Subset(dataset, sorted(idx))
               for split, idx in zip(splits, subset_idx)}
 
-# Compute sample weight (each sample should get its own weight)
-def stratified_sampler(labels: torch.Tensor,
-                       nbins: int = 10) -> WeightedRandomSampler:
-    bin_labels = torch.tensor(pd.qcut(labels.tolist(), q=nbins,
-                                      labels=False, duplicates="drop"))
-    class_sample_count = torch.tensor(
-        [(bin_labels == t).sum() for t in torch.unique(bin_labels, sorted=True)])
-    weight = 1. / class_sample_count.float()
-    samples_weight = torch.zeros_like(labels)
-    for t in torch.unique(bin_labels):
-        samples_weight[bin_labels == t] = weight[t]
-    return WeightedRandomSampler(samples_weight, len(samples_weight))
-
-# Create sampler (only needed for train)
-sampler = stratified_sampler(stratified["train"][:]["arr_1"].view(-1))
+# Create stratified sampler (only needed for training)
+train_sampler = sampler(stratified["train"][:][1].view(-1), stratify=True)
 
 # Init model
 vocab_size = AminoAcidTokenizer("aa20").vocab_size
 model = SequenceLSTM(vocab_size, input_size=64, hidden_size=128, num_layers=2,
-                  num_outputs=2, hidden_dropout=0.25)
+                     num_outputs=2, hidden_dropout=0.25)
 
 # Init callbacks
 # NOTE: Must set model (within save_clbk) to ensure weights get saved
@@ -76,7 +86,6 @@ save_clbk.set_model(model)
 # Init callbacks
 optimizer = optim.AdamW(model.parameters(), lr=1e-3)
 
-step = 0
 epochs = 50
 for epoch in range(1, epochs+1):
     for split in splits:
@@ -84,7 +93,7 @@ for epoch in range(1, epochs+1):
         data_loader = DataLoader(
             dataset=stratified[split],
             batch_size=32,
-            sampler=sampler if split == "train" else None,
+            sampler=train_sampler if split == "train" else None,
             num_workers=mp.cpu_count(),
             pin_memory=torch.cuda.is_available()
         )
@@ -94,13 +103,15 @@ for epoch in range(1, epochs+1):
 
         for it, batch in enumerate(data_loader):
             # Move data (sequence encoded) to GPU (if available)
-            data, target = [arr.to(device) for arr in batch.values()]
+            data, target, sample_weight = [arr.to(device) for arr in batch]
             batch_size = data.size(0)
 
             # Forward pass
             pred = model(data)
             # Loss calculation
-            nll_loss = L.gaussian_nll_loss(pred, target, reduction="sum")
+            nll_loss = L.gaussian_nll_loss(pred, target, reduction="none")
+            # Reweight nll_loss w/ sample weights
+            nll_loss = (nll_loss * sample_weight).sum()
             summed_loss += nll_loss.item()
             loss = nll_loss / batch_size
             # Compute gradients and update params/weights
@@ -108,7 +119,6 @@ for epoch in range(1, epochs+1):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                step += 1
 
             # Bookkeeping (batch)
             if it % 5 == 0 or it+1 == len(data_loader):
