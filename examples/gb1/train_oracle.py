@@ -1,3 +1,5 @@
+"""Train (basic) densely-connected oracle."""
+
 import os
 import time
 import multiprocessing as mp
@@ -26,17 +28,15 @@ splits = ["train", "valid"]
 # Preprocess + load the dataset
 dataset = load_dataset("lstm", "primary", labels="Fitness", num_data=-1,
                        filetype="mdb", as_numpy=False, vocab="aa20")
-# Stratify train/val/test sets such that the target labels are equally
-# represented in each subset. Each subset will have the same ratio of
-# low/mid/high variants in each batch as the full dataset.
-# See: https://discuss.pytorch.org/t/29907/2
+# Stratify train/val/test sets s.t. the target labels are equally represented in
+# each subset. Each subset will have the same ratio of low/mid/high variants in
+# each batch as the full dataset. See: https://discuss.pytorch.org/t/29907/2
 _dataset = dataset[:]["arr_0"]
 _labels = dataset[:]["arr_1"].view(-1)
 # # Remove samples below a certain threshold
-# high_idx = torch.where(_labels < _labels.median())
-# high_idx = torch.where(_labels > 0)
-# _dataset = _dataset[high_idx]
+# high_idx = torch.where(_labels > _labels.mean())
 # dataset = Subset(dataset, sorted(high_idx))
+# _dataset = _dataset[high_idx]
 # _labels = _labels[high_idx]
 
 # Compute sample weights (each sample should get its own weight)
@@ -55,8 +55,7 @@ def sampler(labels: torch.Tensor,
     return WeightedRandomSampler(sample_weights, len(sample_weights))
 
 # Compute sample weights and add to original dataset
-weights = sampler(_labels, nbins=10,
-                  stratify=False).weights.type(torch.float)
+weights = sampler(_labels, nbins=10, stratify=False).weights.type(torch.float)
 dataset = TensorDataset(*dataset[:].values(), weights)
 
 # Create subset indicies
@@ -94,7 +93,6 @@ for epoch in range(1, epochs+1):
         data_loader = DataLoader(
             dataset=stratified[split],
             batch_size=32,
-            # shuffle=split == "train",
             sampler=train_sampler if split == "train" else None,
             num_workers=mp.cpu_count(),
             pin_memory=torch.cuda.is_available()
@@ -115,12 +113,9 @@ for epoch in range(1, epochs+1):
             # Forward pass
             pred = model(onehot)
             # Loss calculation
-            # nll_loss = L.gaussian_nll_loss(pred, target, reduction="sum")
             nll_loss = L.gaussian_nll_loss(pred, target, reduction="none")
             # Reweight nll_loss w/ sample weights
-            # NOTE: Should we normalize sample weights?: https://discuss.pytorch.org/t/25530/4
             nll_loss = (nll_loss * sample_weight).sum()
-            # nll_loss = (nll_loss * sample_weight / sample_weight.sum()).sum()
             summed_loss += nll_loss.item()
             loss = nll_loss / batch_size
             # Compute gradients and update params/weights
