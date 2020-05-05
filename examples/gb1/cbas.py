@@ -419,36 +419,40 @@ def cbas(oracles: typing.List[SequenceOracle],
     return tracker
 
 
-# Run across all oracles, gps and dump results for each "run"
 save_dir = "dumps/3gb1/cbas/"
 os.makedirs(save_dir, exist_ok=True)
-# for oracle_metadata, oracle in all_oracles.items():
-#     for gp_metadata, gp in all_gps.items():
+
+# # Run across all oracles, gps and dump results for each "run"
+# num_iters, num_samples = 50, 200
+# num_total = num_iters * num_samples
+# for oracle_type, oracle in all_oracles.items():
+#     for gp_type, gp in all_gps.items():
 #         # Reload VAEs since original objs. will still hold info from prev. run
 #         vae, vae_0 = load_vaes(seqlen, vocab_size)
-#         tracker = cbas(oracle, gp, vae=vae, vae_0=vae_0, verbose=True)
-#         print(f"oracle={oracle_metadata}, gp={gp_metadata}", tracker)
+#         tracker = cbas(oracle, gp, vae=vae, vae_0=vae_0, num_iters=num_iters,
+#                        num_samples=num_samples, verbose=1)
+#         print(f"oracle={oracle_type}, gp={gp_type}", tracker)
 #         # Convert ndarrays to list, so that we can save dumps properly
 #         tracker["seq"] = tracker["seq"].tolist()
 #         tracker["y_gt"] = tracker["y_gt"].numpy().tolist()
 #         tracker["y_oracle"] = tracker["y_oracle"].numpy().tolist()
-
 #         # Save dump of run to file
-#         filepath = f"oracle={oracle_metadata}__gp={gp_metadata}.json"
+#         filepath = f"oracle={oracle_type}__gp={gp_type}__total={num_total}.json"
 #         with open(os.path.join(save_dir, filepath), "w") as dump_file:
 #             json.dump(tracker, dump_file)
 
 
+# Use dataset (values greater than mean) trained on oracle and gp
 oracle = gp = "g-mean"
 n_iters = 50
-n_samples = 500
+n_samples = 200
 total = n_iters * n_samples
 
 # Load VAEs
 vae, vae_0 = load_vaes(seqlen, vocab_size)
 tracker = cbas(all_oracles["g-mean"], all_gps["g-mean"], vae=vae, vae_0=vae_0,
                num_iters=n_iters, num_samples=n_samples, verbose=1)
-# Save dump of run to file
+# Save dump to file
 tracker["seq"] = tracker["seq"].tolist()
 tracker["y_gt"] = tracker["y_gt"].numpy().tolist()
 tracker["y_oracle"] = tracker["y_oracle"].numpy().tolist()
