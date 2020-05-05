@@ -91,9 +91,8 @@ class RandomSplitter(BaseSplitter):
         splitted_data: tuple of np.ndarrays
             The splitted data (train, val, and test) or their indicies.
         """
-        return super(RandomSplitter, self)\
-            .train_valid_test_split(dataset, frac_train, frac_valid, frac_test,
-                                    return_idxs, seed=seed, **kwargs)
+        return super(RandomSplitter, self).train_valid_test_split(dataset, \
+            frac_train, frac_valid, frac_test, return_idxs, seed=seed, **kwargs)
 
 
     def train_valid_split(self,
@@ -130,6 +129,5 @@ class RandomSplitter(BaseSplitter):
         splitted_data: tuple of np.ndarrays
             The splitted data (train and val) or their indicies.
         """
-        return super(RandomSplitter, self)\
-            .train_valid_split(dataset, frac_train, frac_valid, return_idxs,
-                               seed=seed, **kwargs)
+        return super(RandomSplitter, self).train_valid_split(
+            dataset, frac_train, frac_valid, return_idxs, seed=seed, **kwargs)

@@ -1,14 +1,18 @@
 """Generic gaussian process regressor (GPR) on 3GB1 fitness dataset."""
 
+import os
+import time
+import pickle as pkl
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
-
 import torch
 from torch.utils.data import Subset
+
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 
 from profit.dataset.splitters import split_method_dict
 from profit.models.torch.gpr import SequenceGPR
@@ -17,32 +21,47 @@ from profit.utils.data_utils.tokenizers import AminoAcidTokenizer
 from data import load_dataset
 
 
+timestep = time.strftime("%Y-%b-%d-%H:%M:%S", time.gmtime())
+use_substitution = True     # use aa substitution kernel (does not learn params)
+save_model = False          # save gp model
+savedir = "bin/3gb1/gpr"    # dir for saving model
+plot_seq = False            # plot amino acid seq as xticks
+
 # Preprocess + load the dataset
 dataset = load_dataset("lstm", "primary", labels="Fitness", num_data=-1,
                        filetype="mdb", as_numpy=False, vocab="aa20")
 _dataset = dataset[:]["arr_0"]
 _labels = dataset[:]["arr_1"].view(-1)
+# Remove samples below a certain threshold
+high_idx = torch.where(_labels > _labels.mean())
+dataset = Subset(dataset, sorted(high_idx))
+_dataset = _dataset[high_idx]
+_labels = _labels[high_idx]
 
 # Shuffle, split, and batch
-splits = ["train", "valid"]
-subset_idx = split_method_dict["stratified"]().train_valid_split(_dataset, \
-    _labels.tolist(), frac_train=0.8, frac_valid=0.2, n_bins=10, return_idxs=True)
+splits = {"train": 1.0, "valid": 0.0}
+subset_idx = split_method_dict["stratified"]().train_valid_split(
+    _dataset, _labels.tolist(), frac_train=splits.get("train", 1.0),
+    frac_valid=splits.get("valid", 0.0), n_bins=10, return_idxs=True)
 stratified = {split: Subset(dataset, sorted(idx))
-              for split, idx in zip(splits, subset_idx)}
-
+              for split, idx in zip(splits.keys(), subset_idx)}
 train_X, train_y = stratified["train"][:].values()
-val_X, val_y = stratified["valid"][:].values()
 
 # Instantiate a Gaussian Process model
-use_substitution = True
 if use_substitution:
     gp = SequenceGPR()
 else:
     kernel = C(1.0, (1e-3, 1e3)) * RBF(10, (1e-2, 1e2))
     gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=9)
 
-# Fit to data and optimize kernel params using Maximum Likelihood Estimation (MLE)
+# Fit to data; optimize kernel params using Maximum Likelihood Estimation (MLE)
 gp.fit(train_X, train_y)
+
+# Save GPR
+if save_model:
+    os.makedirs(savedir, exist_ok=True)
+    filepath = os.path.join(savedir, f"{timestep}.pt")
+    _ = gp.save(filepath) if use_substitution else pkl.dumps(gp, filepath)
 
 # Make prediction (mu) on whole sample space (ask for std as well)
 y_pred, sigma = gp.predict(_dataset, return_std=True)
@@ -52,34 +71,32 @@ if isinstance(sigma, torch.Tensor):
     sigma = sigma.numpy()
 
 tokenizer = AminoAcidTokenizer("aa20")
-seqs_4char = []
-for encoded_seq in _dataset.numpy():
-    seq = tokenizer.decode(encoded_seq)
-    seqs_4char.append(seq[38] + seq[39] + seq[40] + seq[53])
-df = pd.DataFrame(columns=["seq", "true", "pred", "sigma"])
-df["seq"] = seqs_4char
-df["true"] = _labels.numpy()
-df["pred"] = y_pred
-df["sigma"] = sigma
-df["is_train"] = [1 if idx in subset_idx[0] else 0 for idx in range(len(dataset))]
+pos = [38, 39, 40, 53]
+df = pd.DataFrame({
+    "is_train": [1 if idx in subset_idx[0] else 0 for idx in range(len(dataset))],
+    "seq": ["".join(tokenizer.decode(seq)) for seq in _dataset[:, pos].numpy()],
+    "true": _labels.numpy(),
+    "pred": y_pred.flatten(),
+    "sigma": sigma.flatten(),
+})
 
-# If x-axis is seq, sort df by seq (in alphabetical order) for "better"
-# visualization. If plotting via index, no need for resorting.
-plot_seq = False
+# If x-axis labels are seq, sort df by seq (in alphabetical order) for "better"
+# visualization; if plotting via index, no need for resorting.
 if plot_seq:
     df = df.sort_values("seq", ascending=True)
 train_only = df.loc[df["is_train"] == 1]
-val_only = df.loc[df["is_train"] == 0]
+valid_only = df.loc[df["is_train"] == 0]
 
 # Determine how well the regressor fit to the dataset
-mse = np.mean(np.square((val_only["pred"] - val_only["true"])))
-print(f"MSE: {mse}")
+train_mse = np.mean(np.square((train_only["pred"] - train_only["true"])))
+valid_mse = np.mean(np.square((valid_only["pred"] - valid_only["true"])))
+print(f"Train MSE: {train_mse}\t Valid MSE: {valid_mse}")
 
 # Plot observations, prediction and 95% confidence interval (2\sigma).
 # NOTE: We plot the whole sequence to avoid erratic line jumps
 plt.figure()
 if plot_seq:
-    # If using 4char amino acid seq as the x-axis values
+    # If using mutated chars amino acid seq as the xtick labels
     plt.plot(df["seq"].values, df["pred"].values, "b-", label="Prediction")
     plt.plot(df["seq"].values, df["true"].values, "r:", label="True")
     plt.plot(train_only["seq"].values, train_only["true"].values, "r.",

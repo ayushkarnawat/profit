@@ -230,10 +230,10 @@ class StratifiedSplitter(BaseSplitter):
         splitted_data: tuple of np.ndarrays
             The splitted data (train, val, and test) or their indicies.
         """
-        return super(StratifiedSplitter, self)\
-            .train_valid_test_split(dataset, frac_train, frac_valid, frac_test,
-                                    return_idxs, labels=labels, n_bins=n_bins,
-                                    seed=seed, task_type=task_type, **kwargs)
+        return super(StratifiedSplitter, self).train_valid_test_split(
+            dataset, frac_train, frac_valid, frac_test, return_idxs,
+            labels=labels, n_bins=n_bins, seed=seed, task_type=task_type,
+            **kwargs)
 
 
     def train_valid_split(self,
@@ -285,7 +285,6 @@ class StratifiedSplitter(BaseSplitter):
         splitted_data: tuple of np.ndarrays
             The splitted data (train and val) or their indicies.
         """
-        return super(StratifiedSplitter, self)\
-            .train_valid_split(dataset, frac_train, frac_valid, return_idxs,
-                               labels=labels, n_bins=n_bins, seed=seed,
-                               task_type=task_type, **kwargs)
+        return super(StratifiedSplitter, self).train_valid_split(
+            dataset, frac_train, frac_valid, return_idxs, labels=labels,
+            n_bins=n_bins, seed=seed, task_type=task_type, **kwargs)

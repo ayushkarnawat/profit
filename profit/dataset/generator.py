@@ -5,6 +5,7 @@ import itertools
 import numpy as np
 import pandas as pd
 
+from profit.utils.data_utils import aa1
 from profit.utils.io_utils import maybe_create_dir
 
 
@@ -26,9 +27,7 @@ def gen(n: int) -> np.ndarray:
     >>> combs = gen(n=2)
     ['AA', 'AR', 'AN', 'AD', ..., 'VV']
     """
-    acids = ['A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I',
-             'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V']
-    combs = list(itertools.product(acids, repeat=n))
+    combs = list(itertools.product(aa1, repeat=n))
     return np.array(["".join(comb) for comb in combs])
 
 
@@ -59,31 +58,3 @@ def generate(save_path: str, n: int = 4) -> None:
     save_path = maybe_create_dir(save_path)
     df.to_csv(save_path, sep=',', header=True, index=False, columns=['ID', 'Variants', 'Fitness'])
     print('Saved generated variants to {0:s}'.format(save_path))
-
-
-if __name__ == "__main__":
-    from tqdm import tqdm
-    from profit.dataset.preprocessors.lstm_preprocessor import LSTMPreprocessor
-    from profit.utils.data_utils.serializers import LMDBSerializer
-
-    # Generate (all) variants
-    seqs = gen(n=4)
-    pos = [39, 40, 41, 54]
-    template = list("MTYKLILNGKTLKGETTTEAVDAATAEKVFKQYANDNGVDGEWTYDDATKTFTVTE")
-
-    # Compute features
-    pp = LSTMPreprocessor(vocab="iupac1")
-    features = []
-    for seq in tqdm(seqs, total=len(seqs)):
-        assert len(seq) == len(pos)
-        for idx, aa in zip(pos, seq):
-            template[idx-1] = aa
-        features.append(pp.get_input_feats(template))
-    features = np.array(features)
-
-    # Save dataset
-    LMDBSerializer.save(features, path="data/3gb1/processed/lstm_fitness/variants.mdb")
-
-    # Compute features (aka embeddings) for those cases
-    # generate('data/raw/variants{}.csv'.format(20**n), n=n)
-    

@@ -10,10 +10,13 @@ from torch.nn import functional as F
 # Anneal KL-divergence term, see: https://arxiv.org/abs/1511.06349
 def _kl_anneal_function(anneal_function: str, step: int, k: float = 0.0025,
                         x0: int = 2500) -> float:
-    if anneal_function == "logistic":
+    if anneal_function is None:
+        return 1.
+    elif anneal_function == "logistic":
         return float(1/(1+math.exp(-k*(step-x0))))
     elif anneal_function == "linear":
         return min(1, step/x0)
+    raise ValueError(f"Invalid annealing function {anneal_function}.")
 
 
 def elbo_loss(pred: torch.Tensor, target: torch.Tensor, mu: torch.Tensor,
@@ -74,28 +77,30 @@ def gaussian_nll_loss(pred: torch.Tensor, target: torch.Tensor,
     target: torch.Tensor, size=(N)
         Ground truth (mean) value.
 
-    reduction: str, default="mean"
+    reduction: str, default="sum"
         Specifies the reduction to apply to the output. If "mean", the
         sum of the output will be divided by the number of elements in
-        the output. If "sum", the output will be summed.
+        the output. If "sum", the output will be summed. If "none", then
+        no reduction will be applied.
 
     References:
     -----------
     [1] D. A. Nix and A. S. Weigend. Estimating the mean and variance of
         the target probability distribution. In Neural Networks, 1994.
+
     [2] http://willwolf.io/2017/05/18/minimizing_the_negative_log_likelihood_in_english/
+
     [3] https://stats.stackexchange.com/q/311331
     """
-    N = pred.size(0)
-    if N != target.size(0):
-        raise ValueError(f"Sizes do not match ({N} != {target.size(0)}).")
-    mu = pred[:, 0]
-    # To ensure positive variance, we apply a softplus and add 1e-6
-    var = F.softplus(pred[:, 1]) + 1e-6
-    logvar = torch.log(var)
+    n_samples = pred.size(0)
+    if n_samples != target.size(0):
+        raise ValueError(f"Sizes do not match ({n_samples} != {target.size(0)}).")
+    mean = pred[:, 0]
+    var = F.softplus(pred[:, 1]) + 1e-6 # positivity constraint
     target = target.squeeze(1)
+    loss = 0.5 * torch.log(math.tau * var) + ((target - mean)**2 / (2 * var))
+    if reduction == "sum":
+        return torch.sum(loss)
     if reduction == "mean":
-        return 0.5 * torch.log(torch.Tensor([math.tau])) + 0.5 * torch.mean(logvar) \
-            + 0.5 * torch.mean(torch.square(target - mu) / var)
-    return 0.5 * N * torch.log(torch.Tensor([math.tau])) + 0.5 * torch.sum(logvar) \
-        + torch.sum(torch.square(target - mu) / (2 * var))
+        return torch.mean(loss)
+    return loss
