@@ -7,6 +7,19 @@ find the optimal variants. In this work, primarily based on [1], we explore a
 protein's evolutionary landscape to efficently find a set of variants for a
 desired design task.
 
+## Quick links
+- [Setup](#setup)
+- [Usage](#usage)
+    * [Preprocessing](#preprocessing)
+    * [Training](#training)
+    * [Optimization](#optimization)
+- [Examples](#examples)
+    * [3GB1 (regression task)](#3GB1-(regression-task))
+- [Notes](#notes)
+    * [Performance](#performance)
+    * [Tensorlfow](#tensorflow)
+- [References](#references)
+
 
 ## Setup
 To install,
@@ -85,7 +98,7 @@ for more details.
 The best way to understand how to best use the module is to refer to the
 actual examples within the `examples/` folder.
 
-### 3GB1 variants (regression task)
+### 3GB1 (regression task)
 To demonstrate the capabilities of how the optimization procedure efficently
 navigates a protein's fitness landscape, we train on actual protein variants,
 provided by [2] (see `examples/gb1`). In particular, it is useful to take a look
@@ -96,12 +109,21 @@ each of these "components" within its optimization scheme, take a look at
 `cbas.py`.
 
 
-## A note on performance
+## Notes
+
+### Performance
 Although some portions of the code are built to support computations on the GPU
 (i.e. model training code), a vast majority of the pre-processing steps occur on
 the CPU, hidden under several abstraction layers. While these are cached after
 the first run, they are severely unoptimized and quite slow. I would like to fix
 this, it is not of high priority (for now).
+
+### Tensorflow
+Disclaimer: The tensorflow portion of the code has not been extensively tested,
+and as such, may have a lot of bugs. I do not have much time to get it working
+as well as the pytorch version (for now), so I'm unsure whether to remove it
+altogether or fix it. Regardless, if you get it working, please submit a PR. I
+will try my best to accommodate any serious bug/feature requests.
 
 
 ## References
